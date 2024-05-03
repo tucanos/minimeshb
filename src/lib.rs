@@ -29,6 +29,7 @@ pub trait Vertex {
 
 pub trait Solution {
     fn from(vals: &[f64]) -> Self;
+    fn m() -> usize;
     fn get(&self, i: usize) -> f64;
 }
 
@@ -123,6 +124,9 @@ impl Tag for i16 {
 }
 
 impl Solution for f32 {
+    fn m() -> usize {
+        1
+    }
     fn from(s: &[f64]) -> Self {
         assert!(s.len() == 1);
         s[0] as f32
@@ -134,6 +138,9 @@ impl Solution for f32 {
 }
 
 impl Solution for [f32; 2] {
+    fn m() -> usize {
+        2
+    }
     fn from(s: &[f64]) -> Self {
         assert!(s.len() == 2);
         [s[0] as f32, s[1] as f32]
@@ -144,6 +151,9 @@ impl Solution for [f32; 2] {
 }
 
 impl Solution for [f32; 3] {
+    fn m() -> usize {
+        3
+    }
     fn from(s: &[f64]) -> Self {
         assert!(s.len() == 3);
         [s[0] as f32, s[1] as f32, s[2] as f32]
@@ -154,6 +164,9 @@ impl Solution for [f32; 3] {
 }
 
 impl Solution for [f32; 6] {
+    fn m() -> usize {
+        6
+    }
     fn from(s: &[f64]) -> Self {
         assert!(s.len() == 6);
         [

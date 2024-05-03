@@ -331,6 +331,8 @@ impl MeshbReader {
     }
 
     pub fn read_solution<S: Solution>(&mut self) -> Result<Vec<S>> {
+        debug!("read field");
+
         let n_verts = self.goto_section("SolAtVertices")?;
 
         let m = self.get_solution_size()?;
