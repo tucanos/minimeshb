@@ -1,6 +1,6 @@
 use log::debug;
 
-use crate::{Element, Error, Result, Solution, Tag, Vertex};
+use crate::{Error, Result};
 use std::{
     fs::File,
     io::{BufWriter, Seek, Write},
@@ -106,7 +106,15 @@ impl MeshbWriter {
         }
     }
 
-    pub fn write_vertices<V: Vertex, T: Tag>(&mut self, verts: &[V], tags: &[T]) -> Result<()> {
+    pub fn write_vertices<
+        const D: usize,
+        I1: ExactSizeIterator<Item = [f64; D]>,
+        I2: ExactSizeIterator<Item = i32>,
+    >(
+        &mut self,
+        verts: I1,
+        tags: I2,
+    ) -> Result<()> {
         assert_eq!(verts.len(), tags.len());
         debug!("write {} vertices", verts.len());
 
@@ -117,25 +125,41 @@ impl MeshbWriter {
         }
     }
 
-    fn write_vertices_ascii<V: Vertex, T: Tag>(&mut self, verts: &[V], tags: &[T]) -> Result<()> {
+    fn write_vertices_ascii<
+        const D: usize,
+        I1: ExactSizeIterator<Item = [f64; D]>,
+        I2: ExactSizeIterator<Item = i32>,
+    >(
+        &mut self,
+        verts: I1,
+        tags: I2,
+    ) -> Result<()> {
         writeln!(self.writer, "Vertices")?;
         writeln!(self.writer, "{}", verts.len())?;
 
         let mut line = String::new();
 
-        for (v, t) in verts.iter().zip(tags.iter()) {
+        for (v, t) in verts.zip(tags) {
             line.clear();
-            for i in 0..self.dimension as usize {
-                line += &format!("{} ", v.get(i));
+            for x in v {
+                line += &format!("{} ", x);
             }
-            line += &format!("{}", t.get());
+            line += &format!("{}", t);
             writeln!(self.writer, "{}", &line)?;
         }
 
         Ok(())
     }
 
-    fn write_vertices_binary<V: Vertex, T: Tag>(&mut self, verts: &[V], tags: &[T]) -> Result<()> {
+    fn write_vertices_binary<
+        const D: usize,
+        I1: ExactSizeIterator<Item = [f64; D]>,
+        I2: ExactSizeIterator<Item = i32>,
+    >(
+        &mut self,
+        verts: I1,
+        tags: I2,
+    ) -> Result<()> {
         let mut next = self.writer.stream_position().unwrap();
         next += std::mem::size_of::<i32>() as u64; // Keyword
         next += 2 * if self.version >= 3 {
@@ -156,21 +180,25 @@ impl MeshbWriter {
         self.write_index(next);
         self.write_index(verts.len() as u64);
 
-        for (v, t) in verts.iter().zip(tags.iter()) {
-            for i in 0..self.dimension as usize {
-                self.write_float(v.get(i));
+        for (v, t) in verts.zip(tags) {
+            for x in v {
+                self.write_float(x);
             }
-            self.write_kwd(t.get());
+            self.write_kwd(t);
         }
 
         Ok(())
     }
 
-    fn write_elements<E: Element, T: Tag>(
+    fn write_elements<
+        const N: usize,
+        I1: ExactSizeIterator<Item = [u64; N]>,
+        I2: ExactSizeIterator<Item = i32>,
+    >(
         &mut self,
         kwd: &str,
-        elems: &[E],
-        tags: &[T],
+        elems: I1,
+        tags: I2,
     ) -> Result<()> {
         assert_eq!(elems.len(), tags.len());
         debug!("write {} elements", elems.len());
@@ -182,11 +210,15 @@ impl MeshbWriter {
         }
     }
 
-    fn write_elements_ascii<E: Element, T: Tag>(
+    fn write_elements_ascii<
+        const N: usize,
+        I1: ExactSizeIterator<Item = [u64; N]>,
+        I2: ExactSizeIterator<Item = i32>,
+    >(
         &mut self,
         kwd: &str,
-        elems: &[E],
-        tags: &[T],
+        elems: I1,
+        tags: I2,
     ) -> Result<()> {
         let m = match kwd {
             "Edges" => 2,
@@ -194,29 +226,34 @@ impl MeshbWriter {
             "Tetrahedra" => 4,
             _ => unreachable!(),
         };
+        assert_eq!(N, m);
 
         writeln!(self.writer, "{}", kwd)?;
         writeln!(self.writer, "{}", elems.len())?;
 
         let mut line = String::new();
 
-        for (v, t) in elems.iter().zip(tags.iter()) {
+        for (v, t) in elems.zip(tags) {
             line.clear();
-            for i in 0..m {
-                line += &format!("{} ", v.get(i) + 1);
+            for x in v {
+                line += &format!("{} ", x + 1);
             }
-            line += &format!("{}", t.get());
+            line += &format!("{}", t);
             writeln!(self.writer, "{}", &line)?;
         }
 
         Ok(())
     }
 
-    fn write_elements_binary<E: Element, T: Tag>(
+    fn write_elements_binary<
+        const N: usize,
+        I1: ExactSizeIterator<Item = [u64; N]>,
+        I2: ExactSizeIterator<Item = i32>,
+    >(
         &mut self,
         kwd: &str,
-        elems: &[E],
-        tags: &[T],
+        elems: I1,
+        tags: I2,
     ) -> Result<()> {
         let (m, kwd) = match kwd {
             "Edges" => (2, 5),
@@ -245,29 +282,53 @@ impl MeshbWriter {
         self.write_index(next);
         self.write_index(elems.len() as u64);
 
-        for (v, t) in elems.iter().zip(tags.iter()) {
-            for i in 0..m {
-                self.write_index(v.get(i as usize) + 1);
+        for (v, t) in elems.zip(tags) {
+            for x in v {
+                self.write_index(x + 1);
             }
-            self.write_kwd(t.get());
+            self.write_kwd(t);
         }
 
         Ok(())
     }
 
-    pub fn write_edges<E: Element, T: Tag>(&mut self, elems: &[E], tags: &[T]) -> Result<()> {
+    pub fn write_edges<
+        I1: ExactSizeIterator<Item = [u64; 2]>,
+        I2: ExactSizeIterator<Item = i32>,
+    >(
+        &mut self,
+        elems: I1,
+        tags: I2,
+    ) -> Result<()> {
         self.write_elements("Edges", elems, tags)
     }
 
-    pub fn write_triangles<E: Element, T: Tag>(&mut self, elems: &[E], tags: &[T]) -> Result<()> {
+    pub fn write_triangles<
+        I1: ExactSizeIterator<Item = [u64; 3]>,
+        I2: ExactSizeIterator<Item = i32>,
+    >(
+        &mut self,
+        elems: I1,
+        tags: I2,
+    ) -> Result<()> {
         self.write_elements("Triangles", elems, tags)
     }
 
-    pub fn write_tetrahedra<E: Element, T: Tag>(&mut self, elems: &[E], tags: &[T]) -> Result<()> {
+    pub fn write_tetrahedra<
+        I1: ExactSizeIterator<Item = [u64; 4]>,
+        I2: ExactSizeIterator<Item = i32>,
+    >(
+        &mut self,
+        elems: I1,
+        tags: I2,
+    ) -> Result<()> {
         self.write_elements("Tetrahedra", elems, tags)
     }
 
-    pub fn write_solution<S: Solution>(&mut self, sols: &[S]) -> Result<()> {
+    pub fn write_solution<const N: usize, I: ExactSizeIterator<Item = [f64; N]>>(
+        &mut self,
+        sols: I,
+    ) -> Result<()> {
         debug!("write field");
 
         if self.is_binary {
@@ -277,29 +338,32 @@ impl MeshbWriter {
         }
     }
 
-    fn get_solution_type<S: Solution>(&self) -> Result<u8> {
-        if S::m() == 1 {
+    fn get_solution_type<const N: usize>(&self) -> Result<u8> {
+        if N == 1 {
             Ok(1)
-        } else if S::m() == self.dimension as usize {
+        } else if N == self.dimension as usize {
             Ok(2)
-        } else if S::m() == (self.dimension * (self.dimension + 1) / 2) as usize {
+        } else if N == (self.dimension * (self.dimension + 1) / 2) as usize {
             Ok(3)
         } else {
-            Err(Error::from(&format!("Unvalid field size {}", S::m())))
+            Err(Error::from(&format!("Unvalid field size {}", N)))
         }
     }
 
-    fn write_solution_ascii<S: Solution>(&mut self, sols: &[S]) -> Result<()> {
+    fn write_solution_ascii<const N: usize, I: ExactSizeIterator<Item = [f64; N]>>(
+        &mut self,
+        sols: I,
+    ) -> Result<()> {
         writeln!(self.writer, "SolAtVertices")?;
         writeln!(self.writer, "{}", sols.len())?;
-        writeln!(self.writer, "1 {}", self.get_solution_type::<S>()?)?;
+        writeln!(self.writer, "1 {}", self.get_solution_type::<N>()?)?;
 
         let mut line = String::new();
 
-        for s in sols.iter() {
+        for s in sols {
             line.clear();
-            for i in 0..S::m() {
-                line += &format!("{} ", s.get(i));
+            for x in s {
+                line += &format!("{} ", x);
             }
             writeln!(self.writer, "{}", &line)?;
         }
@@ -307,7 +371,10 @@ impl MeshbWriter {
         Ok(())
     }
 
-    fn write_solution_binary<S: Solution>(&mut self, sols: &[S]) -> Result<()> {
+    fn write_solution_binary<const N: usize, I: ExactSizeIterator<Item = [f64; N]>>(
+        &mut self,
+        sols: I,
+    ) -> Result<()> {
         let mut next = self.writer.stream_position().unwrap();
         next += std::mem::size_of::<i32>() as u64; // Keyword
         next += 2 * if self.version >= 3 {
@@ -316,7 +383,7 @@ impl MeshbWriter {
             std::mem::size_of::<u32>() as u64
         }; // Next + Size
         next += 2 * std::mem::size_of::<u32>() as u64; // field type
-        next += S::m() as u64
+        next += N as u64
             * sols.len() as u64
             * if self.version == 1 {
                 std::mem::size_of::<f32>() as u64
@@ -328,11 +395,11 @@ impl MeshbWriter {
         self.write_index(next);
         self.write_index(sols.len() as u64);
         self.write_kwd(1);
-        self.write_kwd(self.get_solution_type::<S>()? as i32);
+        self.write_kwd(self.get_solution_type::<N>()? as i32);
 
-        for s in sols.iter() {
-            for i in 0..S::m() {
-                self.write_float(s.get(i));
+        for s in sols {
+            for x in s {
+                self.write_float(x);
             }
         }
 
@@ -346,6 +413,23 @@ mod tests {
     use crate::reader::MeshbReader;
     use tempfile::NamedTempFile;
 
+    fn to_vecs<const N: usize, T, I: ExactSizeIterator<Item = ([T; N], i32)>>(
+        it: I,
+    ) -> (Vec<[T; N]>, Vec<i32>) {
+        let mut a = Vec::with_capacity(it.len());
+        let mut b = Vec::with_capacity(it.len());
+
+        for (x, y) in it {
+            a.push(x);
+            b.push(y);
+        }
+        (a, b)
+    }
+
+    fn to_vec<const N: usize, T, I: ExactSizeIterator<Item = [T; N]>>(it: I) -> Vec<[T; N]> {
+        it.collect()
+    }
+
     #[test]
     fn test_write_ascii_3d() {
         let mut reader = MeshbReader::new("./data/mesh3d.mesh").unwrap();
@@ -354,22 +438,28 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 1, 3).unwrap();
 
-        let (verts, vtags) = reader.read_vertices::<[f64; 3], ()>().unwrap();
-        writer.write_vertices(&verts, &vtags).unwrap();
+        let (verts, vtags) = to_vecs(reader.read_vertices::<3>().unwrap());
+        writer
+            .write_vertices(verts.iter().cloned(), vtags.iter().cloned())
+            .unwrap();
 
-        let (tris, tritags) = reader.read_triangles::<[u32; 3], i16>().unwrap();
-        writer.write_triangles(&tris, &tritags).unwrap();
+        let (tris, tritags) = to_vecs(reader.read_triangles().unwrap());
+        writer
+            .write_triangles(tris.iter().cloned(), tritags.iter().cloned())
+            .unwrap();
 
-        let (tets, tettags) = reader.read_tetrahedra::<[u32; 4], i16>().unwrap();
-        writer.write_tetrahedra(&tets, &tettags).unwrap();
+        let (tets, tettags) = to_vecs(reader.read_tetrahedra().unwrap());
+        writer
+            .write_tetrahedra(tets.iter().cloned(), tettags.iter().cloned())
+            .unwrap();
 
         writer.close();
 
         let mut reader2 = MeshbReader::new(&fname).unwrap();
         assert!(!reader2.is_binary());
-        let (verts2, vtags2) = reader2.read_vertices::<[f64; 3], ()>().unwrap();
-        let (tris2, tritags2) = reader2.read_triangles::<[u32; 3], i16>().unwrap();
-        let (tets2, tettags2) = reader2.read_tetrahedra::<[u32; 4], i16>().unwrap();
+        let (verts2, vtags2) = to_vecs(reader2.read_vertices::<3>().unwrap());
+        let (tris2, tritags2) = to_vecs(reader2.read_triangles().unwrap());
+        let (tets2, tettags2) = to_vecs(reader2.read_tetrahedra().unwrap());
 
         for (vert0, vert1) in verts.iter().zip(verts2.iter()) {
             for (v0, v1) in vert0.iter().zip(vert1.iter()) {
@@ -410,22 +500,28 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 1, 3).unwrap();
 
-        let (verts, vtags) = reader.read_vertices::<[f64; 3], ()>().unwrap();
-        writer.write_vertices(&verts, &vtags).unwrap();
+        let (verts, vtags) = to_vecs(reader.read_vertices::<3>().unwrap());
+        writer
+            .write_vertices(verts.iter().cloned(), vtags.iter().cloned())
+            .unwrap();
 
-        let (tris, tritags) = reader.read_triangles::<[u32; 3], i16>().unwrap();
-        writer.write_triangles(&tris, &tritags).unwrap();
+        let (tris, tritags) = to_vecs(reader.read_triangles().unwrap());
+        writer
+            .write_triangles(tris.iter().cloned(), tritags.iter().cloned())
+            .unwrap();
 
-        let (tets, tettags) = reader.read_tetrahedra::<[u32; 4], i16>().unwrap();
-        writer.write_tetrahedra(&tets, &tettags).unwrap();
+        let (tets, tettags) = to_vecs(reader.read_tetrahedra().unwrap());
+        writer
+            .write_tetrahedra(tets.iter().cloned(), tettags.iter().cloned())
+            .unwrap();
 
         writer.close();
 
         let mut reader2 = MeshbReader::new(&fname).unwrap();
         assert!(reader2.is_binary());
-        let (verts2, vtags2) = reader2.read_vertices::<[f64; 3], ()>().unwrap();
-        let (tris2, tritags2) = reader2.read_triangles::<[u32; 3], i16>().unwrap();
-        let (tets2, tettags2) = reader2.read_tetrahedra::<[u32; 4], i16>().unwrap();
+        let (verts2, vtags2) = to_vecs(reader2.read_vertices::<3>().unwrap());
+        let (tris2, tritags2) = to_vecs(reader2.read_triangles().unwrap());
+        let (tets2, tettags2) = to_vecs(reader2.read_tetrahedra().unwrap());
 
         for (vert0, vert1) in verts.iter().zip(verts2.iter()) {
             for (v0, v1) in vert0.iter().zip(vert1.iter()) {
@@ -466,14 +562,20 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 4, 3).unwrap();
 
-        let (verts, vtags) = reader.read_vertices::<[f64; 3], ()>().unwrap();
-        writer.write_vertices(&verts, &vtags).unwrap();
+        let (verts, vtags) = to_vecs(reader.read_vertices::<3>().unwrap());
+        writer
+            .write_vertices(verts.iter().cloned(), vtags.iter().cloned())
+            .unwrap();
 
-        let (tris, tritags) = reader.read_triangles::<[u32; 3], i16>().unwrap();
-        writer.write_triangles(&tris, &tritags).unwrap();
+        let (tris, tritags) = to_vecs(reader.read_triangles().unwrap());
+        writer
+            .write_triangles(tris.iter().cloned(), tritags.iter().cloned())
+            .unwrap();
 
-        let (tets, tettags) = reader.read_tetrahedra::<[u32; 4], i16>().unwrap();
-        writer.write_tetrahedra(&tets, &tettags).unwrap();
+        let (tets, tettags) = to_vecs(reader.read_tetrahedra().unwrap());
+        writer
+            .write_tetrahedra(tets.iter().cloned(), tettags.iter().cloned())
+            .unwrap();
 
         writer.close();
 
@@ -481,9 +583,9 @@ mod tests {
         assert!(reader2.is_binary());
         assert_eq!(reader2.version(), 4);
 
-        let (verts2, vtags2) = reader2.read_vertices::<[f64; 3], ()>().unwrap();
-        let (tris2, tritags2) = reader2.read_triangles::<[u32; 3], i16>().unwrap();
-        let (tets2, tettags2) = reader2.read_tetrahedra::<[u32; 4], i16>().unwrap();
+        let (verts2, vtags2) = to_vecs(reader2.read_vertices::<3>().unwrap());
+        let (tris2, tritags2) = to_vecs(reader2.read_triangles().unwrap());
+        let (tets2, tettags2) = to_vecs(reader2.read_tetrahedra().unwrap());
 
         for (vert0, vert1) in verts.iter().zip(verts2.iter()) {
             for (v0, v1) in vert0.iter().zip(vert1.iter()) {
@@ -524,17 +626,17 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 1, 3).unwrap();
 
-        let sols = reader.read_solution::<f32>().unwrap();
-        writer.write_solution(&sols).unwrap();
+        let sols = to_vec(reader.read_solution::<1>().unwrap());
+        writer.write_solution(sols.iter().cloned()).unwrap();
 
         writer.close();
 
         let mut reader2 = MeshbReader::new(&fname).unwrap();
         assert!(!reader2.is_binary());
-        let sols2 = reader2.read_solution::<f32>().unwrap();
+        let sols2 = to_vec(reader2.read_solution::<1>().unwrap());
 
         for (sol0, sol1) in sols.iter().zip(sols2.iter()) {
-            assert!((sol0 - sol1).abs() < 1e-6);
+            assert!((sol0[0] - sol1[0]).abs() < 1e-6);
         }
     }
 
@@ -546,14 +648,14 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 1, 3).unwrap();
 
-        let sols = reader.read_solution::<[f32; 3]>().unwrap();
-        writer.write_solution(&sols).unwrap();
+        let sols = to_vec(reader.read_solution::<3>().unwrap());
+        writer.write_solution(sols.iter().cloned()).unwrap();
 
         writer.close();
 
         let mut reader2 = MeshbReader::new(&fname).unwrap();
         assert!(!reader2.is_binary());
-        let sols2 = reader2.read_solution::<[f32; 3]>().unwrap();
+        let sols2 = to_vec(reader2.read_solution::<3>().unwrap());
 
         for (sol0, sol1) in sols.iter().zip(sols2.iter()) {
             for (s0, s1) in sol0.iter().zip(sol1.iter()) {
@@ -570,17 +672,17 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 1, 3).unwrap();
 
-        let sols = reader.read_solution::<f32>().unwrap();
-        writer.write_solution(&sols).unwrap();
+        let sols = to_vec(reader.read_solution::<1>().unwrap());
+        writer.write_solution(sols.iter().cloned()).unwrap();
 
         writer.close();
 
         let mut reader2 = MeshbReader::new(&fname).unwrap();
         assert!(reader2.is_binary());
-        let sols2 = reader2.read_solution::<f32>().unwrap();
+        let sols2 = to_vec(reader2.read_solution::<1>().unwrap());
 
         for (sol0, sol1) in sols.iter().zip(sols2.iter()) {
-            assert!((sol0 - sol1).abs() < 1e-6);
+            assert!((sol0[0] - sol1[0]).abs() < 1e-6);
         }
     }
 
@@ -592,14 +694,14 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 1, 3).unwrap();
 
-        let sols = reader.read_solution::<[f32; 3]>().unwrap();
-        writer.write_solution(&sols).unwrap();
+        let sols = to_vec(reader.read_solution::<3>().unwrap());
+        writer.write_solution(sols.iter().cloned()).unwrap();
 
         writer.close();
 
         let mut reader2 = MeshbReader::new(&fname).unwrap();
         assert!(reader2.is_binary());
-        let sols2 = reader2.read_solution::<[f32; 3]>().unwrap();
+        let sols2 = to_vec(reader2.read_solution::<3>().unwrap());
 
         for (sol0, sol1) in sols.iter().zip(sols2.iter()) {
             for (s0, s1) in sol0.iter().zip(sol1.iter()) {
@@ -616,22 +718,28 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 1, 2).unwrap();
 
-        let (verts, vtags) = reader.read_vertices::<[f64; 2], ()>().unwrap();
-        writer.write_vertices(&verts, &vtags).unwrap();
+        let (verts, vtags) = to_vecs(reader.read_vertices::<2>().unwrap());
+        writer
+            .write_vertices(verts.iter().cloned(), vtags.iter().cloned())
+            .unwrap();
 
-        let (edgs, edgtags) = reader.read_edges::<[u32; 2], i16>().unwrap();
-        writer.write_edges(&edgs, &edgtags).unwrap();
+        let (edgs, edgtags) = to_vecs(reader.read_edges().unwrap());
+        writer
+            .write_edges(edgs.iter().cloned(), edgtags.iter().cloned())
+            .unwrap();
 
-        let (tris, tritags) = reader.read_triangles::<[u32; 3], i16>().unwrap();
-        writer.write_triangles(&tris, &tritags).unwrap();
+        let (tris, tritags) = to_vecs(reader.read_triangles().unwrap());
+        writer
+            .write_triangles(tris.iter().cloned(), tritags.iter().cloned())
+            .unwrap();
 
         writer.close();
 
         let mut reader2 = MeshbReader::new(&fname).unwrap();
         assert!(!reader2.is_binary());
-        let (verts2, vtags2) = reader2.read_vertices::<[f64; 2], ()>().unwrap();
-        let (edgs2, edgtags2) = reader2.read_edges::<[u32; 2], i16>().unwrap();
-        let (tris2, tritags2) = reader2.read_triangles::<[u32; 3], i16>().unwrap();
+        let (verts2, vtags2) = to_vecs(reader2.read_vertices::<2>().unwrap());
+        let (edgs2, edgtags2) = to_vecs(reader2.read_edges().unwrap());
+        let (tris2, tritags2) = to_vecs(reader2.read_triangles().unwrap());
 
         for (vert0, vert1) in verts.iter().zip(verts2.iter()) {
             for (v0, v1) in vert0.iter().zip(vert1.iter()) {
@@ -672,22 +780,28 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 1, 2).unwrap();
 
-        let (verts, vtags) = reader.read_vertices::<[f64; 2], ()>().unwrap();
-        writer.write_vertices(&verts, &vtags).unwrap();
+        let (verts, vtags) = to_vecs(reader.read_vertices::<2>().unwrap());
+        writer
+            .write_vertices(verts.iter().cloned(), vtags.iter().cloned())
+            .unwrap();
 
-        let (edgs, edgtags) = reader.read_edges::<[u32; 2], i16>().unwrap();
-        writer.write_edges(&edgs, &edgtags).unwrap();
+        let (edgs, edgtags) = to_vecs(reader.read_edges().unwrap());
+        writer
+            .write_edges(edgs.iter().cloned(), edgtags.iter().cloned())
+            .unwrap();
 
-        let (tris, tritags) = reader.read_triangles::<[u32; 3], i16>().unwrap();
-        writer.write_triangles(&tris, &tritags).unwrap();
+        let (tris, tritags) = to_vecs(reader.read_triangles().unwrap());
+        writer
+            .write_triangles(tris.iter().cloned(), tritags.iter().cloned())
+            .unwrap();
 
         writer.close();
 
         let mut reader2 = MeshbReader::new(&fname).unwrap();
         assert!(reader2.is_binary());
-        let (verts2, vtags2) = reader2.read_vertices::<[f64; 2], ()>().unwrap();
-        let (edgs2, edgtags2) = reader2.read_edges::<[u32; 2], i16>().unwrap();
-        let (tris2, tritags2) = reader2.read_triangles::<[u32; 3], i16>().unwrap();
+        let (verts2, vtags2) = to_vecs(reader2.read_vertices::<2>().unwrap());
+        let (edgs2, edgtags2) = to_vecs(reader2.read_edges().unwrap());
+        let (tris2, tritags2) = to_vecs(reader2.read_triangles().unwrap());
 
         for (vert0, vert1) in verts.iter().zip(verts2.iter()) {
             for (v0, v1) in vert0.iter().zip(vert1.iter()) {
@@ -728,22 +842,28 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 4, 2).unwrap();
 
-        let (verts, vtags) = reader.read_vertices::<[f64; 2], ()>().unwrap();
-        writer.write_vertices(&verts, &vtags).unwrap();
+        let (verts, vtags) = to_vecs(reader.read_vertices::<2>().unwrap());
+        writer
+            .write_vertices(verts.iter().cloned(), vtags.iter().cloned())
+            .unwrap();
 
-        let (edgs, edgtags) = reader.read_edges::<[u32; 2], i16>().unwrap();
-        writer.write_edges(&edgs, &edgtags).unwrap();
+        let (edgs, edgtags) = to_vecs(reader.read_edges().unwrap());
+        writer
+            .write_edges(edgs.iter().cloned(), edgtags.iter().cloned())
+            .unwrap();
 
-        let (tris, tritags) = reader.read_triangles::<[u32; 3], i16>().unwrap();
-        writer.write_triangles(&tris, &tritags).unwrap();
+        let (tris, tritags) = to_vecs(reader.read_triangles().unwrap());
+        writer
+            .write_triangles(tris.iter().cloned(), tritags.iter().cloned())
+            .unwrap();
 
         writer.close();
 
         let mut reader2 = MeshbReader::new(&fname).unwrap();
         assert!(reader2.is_binary());
-        let (verts2, vtags2) = reader2.read_vertices::<[f64; 2], ()>().unwrap();
-        let (edgs2, edgtags2) = reader2.read_edges::<[u32; 2], i16>().unwrap();
-        let (tris2, tritags2) = reader2.read_triangles::<[u32; 3], i16>().unwrap();
+        let (verts2, vtags2) = to_vecs(reader2.read_vertices::<2>().unwrap());
+        let (edgs2, edgtags2) = to_vecs(reader2.read_edges().unwrap());
+        let (tris2, tritags2) = to_vecs(reader2.read_triangles().unwrap());
 
         for (vert0, vert1) in verts.iter().zip(verts2.iter()) {
             for (v0, v1) in vert0.iter().zip(vert1.iter()) {
@@ -784,17 +904,17 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 1, 2).unwrap();
 
-        let sols = reader.read_solution::<f32>().unwrap();
-        writer.write_solution(&sols).unwrap();
+        let sols = to_vec(reader.read_solution::<1>().unwrap());
+        writer.write_solution(sols.iter().cloned()).unwrap();
 
         writer.close();
 
         let mut reader2 = MeshbReader::new(&fname).unwrap();
         assert!(!reader2.is_binary());
-        let sols2 = reader2.read_solution::<f32>().unwrap();
+        let sols2 = to_vec(reader2.read_solution::<1>().unwrap());
 
         for (sol0, sol1) in sols.iter().zip(sols2.iter()) {
-            assert!((sol0 - sol1).abs() < 1e-6);
+            assert!((sol0[0] - sol1[0]).abs() < 1e-6);
         }
     }
 
@@ -806,14 +926,14 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 1, 2).unwrap();
 
-        let sols = reader.read_solution::<[f32; 2]>().unwrap();
-        writer.write_solution(&sols).unwrap();
+        let sols = to_vec(reader.read_solution::<2>().unwrap());
+        writer.write_solution(sols.iter().cloned()).unwrap();
 
         writer.close();
 
         let mut reader2 = MeshbReader::new(&fname).unwrap();
         assert!(!reader2.is_binary());
-        let sols2 = reader2.read_solution::<[f32; 2]>().unwrap();
+        let sols2 = to_vec(reader2.read_solution::<2>().unwrap());
 
         for (sol0, sol1) in sols.iter().zip(sols2.iter()) {
             for (s0, s1) in sol0.iter().zip(sol1.iter()) {
@@ -830,17 +950,17 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 1, 2).unwrap();
 
-        let sols = reader.read_solution::<f32>().unwrap();
-        writer.write_solution(&sols).unwrap();
+        let sols = to_vec(reader.read_solution::<1>().unwrap());
+        writer.write_solution(sols.iter().cloned()).unwrap();
 
         writer.close();
 
         let mut reader2 = MeshbReader::new(&fname).unwrap();
         assert!(reader2.is_binary());
-        let sols2 = reader2.read_solution::<f32>().unwrap();
+        let sols2 = to_vec(reader2.read_solution::<1>().unwrap());
 
         for (sol0, sol1) in sols.iter().zip(sols2.iter()) {
-            assert!((sol0 - sol1).abs() < 1e-6);
+            assert!((sol0[0] - sol1[0]).abs() < 1e-6);
         }
     }
 
@@ -852,14 +972,14 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, 1, 2).unwrap();
 
-        let sols = reader.read_solution::<[f32; 2]>().unwrap();
-        writer.write_solution(&sols).unwrap();
+        let sols = to_vec(reader.read_solution::<2>().unwrap());
+        writer.write_solution(sols.iter().cloned()).unwrap();
 
         writer.close();
 
         let mut reader2 = MeshbReader::new(&fname).unwrap();
         assert!(reader2.is_binary());
-        let sols2 = reader2.read_solution::<[f32; 2]>().unwrap();
+        let sols2 = to_vec(reader2.read_solution::<2>().unwrap());
 
         for (sol0, sol1) in sols.iter().zip(sols2.iter()) {
             for (s0, s1) in sol0.iter().zip(sol1.iter()) {

@@ -1,6 +1,5 @@
+use crate::{Error, Result};
 use log::debug;
-
-use crate::{Element, Error, Result, Solution, Tag, Vertex};
 use std::{
     collections::HashMap,
     fs::File,
@@ -199,104 +198,101 @@ impl MeshbReader {
         Err(Error::from(&format!("Unable to get section {kwd}")))
     }
 
-    pub fn read_vertices<V: Vertex, T: Tag>(&mut self) -> Result<(Vec<V>, Vec<T>)> {
+    pub fn read_vertices<const D: usize>(
+        &mut self,
+    ) -> Result<impl ExactSizeIterator<Item = ([f64; D], i32)> + '_> {
+        assert_eq!(D, self.dimension as usize);
+
         let n_verts = self.goto_section("Vertices")?;
         debug!("read {n_verts} vertices");
 
-        let mut verts = Vec::with_capacity(n_verts);
-        let mut tags = Vec::with_capacity(n_verts);
-
-        let mut vals = vec![0.0; self.dimension as usize];
+        let mut vals = [0.0; D];
         let mut tag = -1;
 
         let mut line = String::new();
-        while verts.len() < n_verts {
+
+        Ok((0..n_verts).map(move |_| {
             if self.is_binary {
                 for v in vals.iter_mut() {
                     *v = self.read_float();
                 }
                 tag = self.read_kwd();
             } else {
-                let len = self.reader.read_line(&mut line)?;
+                let len = self.reader.read_line(&mut line).unwrap();
                 assert_ne!(len, 0);
                 let trimmed_line = line.trim();
-                if trimmed_line.is_empty() {
-                    continue;
-                }
+                assert!(!trimmed_line.is_empty());
                 for (i, v) in trimmed_line.split(' ').enumerate() {
-                    if i < self.dimension as usize {
+                    if i < D {
                         vals[i] = v.parse().unwrap();
                     }
-                    if i == self.dimension as usize {
+                    if i == D {
                         tag = v.parse().unwrap();
                     }
                 }
                 line.clear();
             }
-            verts.push(V::from(&vals));
-            tags.push(T::from(tag));
-        }
-
-        Ok((verts, tags))
+            (vals, tag)
+        }))
     }
 
-    fn read_elements<E: Element, T: Tag>(&mut self, kwd: &str) -> Result<(Vec<E>, Vec<T>)> {
-        let n_elems = self.goto_section(kwd)?;
-        debug!("read {n_elems} elements");
-
+    fn read_elements<const N: usize>(
+        &mut self,
+        kwd: &str,
+    ) -> Result<impl ExactSizeIterator<Item = ([u64; N], i32)> + '_> {
         let m = match kwd {
             "Edges" => 2,
             "Triangles" => 3,
             "Tetrahedra" => 4,
             _ => unreachable!(),
         };
+        assert_eq!(N, m);
 
-        let mut elems = Vec::with_capacity(n_elems);
-        let mut tags = Vec::with_capacity(n_elems);
+        let n_elems = self.goto_section(kwd)?;
+        debug!("read {n_elems} elements");
 
-        let mut vals = vec![0_u64; m];
+        let mut vals = [0_u64; N];
         let mut tag = -1;
         let mut line = String::new();
 
-        while elems.len() < n_elems {
+        Ok((0..n_elems).map(move |_| {
             if self.is_binary {
                 for v in vals.iter_mut() {
                     *v = self.read_index() - 1;
                 }
                 tag = self.read_kwd();
             } else {
-                let len = self.reader.read_line(&mut line)?;
+                let len = self.reader.read_line(&mut line).unwrap();
                 assert_ne!(len, 0);
                 let trimmed_line = line.trim();
-                if trimmed_line.is_empty() {
-                    continue;
-                }
+                assert!(!trimmed_line.is_empty());
                 for (i, v) in trimmed_line.split(' ').enumerate() {
-                    if i < m {
+                    if i < N {
                         vals[i] = v.parse::<u64>().unwrap() - 1;
                     }
-                    if i == m {
+                    if i == N {
                         tag = v.parse().unwrap();
                     }
                 }
                 line.clear();
             }
-            elems.push(E::from(&vals));
-            tags.push(T::from(tag));
-        }
-
-        Ok((elems, tags))
+            (vals, tag)
+        }))
     }
 
-    pub fn read_edges<E: Element, T: Tag>(&mut self) -> Result<(Vec<E>, Vec<T>)> {
+    pub fn read_edges(&mut self) -> Result<impl ExactSizeIterator<Item = ([u64; 2], i32)> + '_> {
         self.read_elements("Edges")
     }
 
-    pub fn read_triangles<E: Element, T: Tag>(&mut self) -> Result<(Vec<E>, Vec<T>)> {
+    pub fn read_triangles(
+        &mut self,
+    ) -> Result<impl ExactSizeIterator<Item = ([u64; 3], i32)> + '_> {
         self.read_elements("Triangles")
     }
 
-    pub fn read_tetrahedra<E: Element, T: Tag>(&mut self) -> Result<(Vec<E>, Vec<T>)> {
+    pub fn read_tetrahedra(
+        &mut self,
+    ) -> Result<impl ExactSizeIterator<Item = ([u64; 4], i32)> + '_> {
         self.read_elements("Tetrahedra")
     }
 
@@ -330,45 +326,48 @@ impl MeshbReader {
         }
     }
 
-    pub fn read_solution<S: Solution>(&mut self) -> Result<Vec<S>> {
-        debug!("read field");
-
+    pub fn read_solution<const N: usize>(
+        &mut self,
+    ) -> Result<impl ExactSizeIterator<Item = [f64; N]> + '_> {
         let n_verts = self.goto_section("SolAtVertices")?;
-
         let m = self.get_solution_size()?;
+        assert_eq!(N, m);
+
+        debug!("read field");
 
         let mut sol = Vec::with_capacity(n_verts);
 
-        let mut vals = vec![0.0; m];
-        if !self.is_binary {
-            vals.clear();
-        }
+        let mut vals = [0.0; N];
         let mut line = String::new();
-        while sol.len() < n_verts {
+        let mut idx = 0;
+        let mut tmp = Vec::new();
+
+        Ok((0..n_verts).map(move |_| {
             if self.is_binary {
                 for v in vals.iter_mut() {
                     *v = self.read_float();
                 }
-                sol.push(S::from(&vals));
+                sol.push(vals);
             } else {
-                let len = self.reader.read_line(&mut line)?;
-                assert_ne!(len, 0);
-                let trimmed_line = line.trim();
-                if trimmed_line.is_empty() {
-                    continue;
-                }
-                for v in trimmed_line.split(' ') {
-                    vals.push(v.parse().unwrap());
-                    if vals.len() == m {
-                        sol.push(S::from(&vals));
-                        vals.clear();
+                for v in vals.iter_mut() {
+                    if idx == tmp.len() {
+                        line.clear();
+                        let len = self.reader.read_line(&mut line).unwrap();
+                        assert_ne!(len, 0);
+                        let trimmed_line = line.trim();
+                        assert!(!trimmed_line.is_empty());
+                        tmp.clear();
+                        for x in trimmed_line.split(' ') {
+                            tmp.push(x.parse().unwrap())
+                        }
+                        idx = 0;
                     }
+                    *v = tmp[idx];
+                    idx += 1;
                 }
-                line.clear();
             }
-        }
-
-        Ok(sol)
+            vals
+        }))
     }
 }
 
@@ -376,46 +375,57 @@ impl MeshbReader {
 mod tests {
     use super::MeshbReader;
 
+    fn to_vecs<const N: usize, T, I: ExactSizeIterator<Item = ([T; N], i32)>>(
+        it: I,
+    ) -> (Vec<[T; N]>, Vec<i32>) {
+        let mut a = Vec::with_capacity(it.len());
+        let mut b = Vec::with_capacity(it.len());
+
+        for (x, y) in it {
+            a.push(x);
+            b.push(y);
+        }
+        (a, b)
+    }
+
     #[test]
     fn test_read_ascii_3d() {
         let mut reader = MeshbReader::new("./data/mesh3d.mesh").unwrap();
         assert_eq!(reader.dimension(), 3);
 
-        let (verts, _) = reader.read_vertices::<[f64; 3], ()>().unwrap();
+        let (verts, _) = to_vecs(reader.read_vertices::<3>().unwrap());
         assert_eq!(verts.len(), 26);
-        let (tris, tags) = reader.read_triangles::<[u32; 3], i16>().unwrap();
+        let (tris, _) = to_vecs(reader.read_triangles().unwrap());
         assert_eq!(tris.len(), 48);
-        assert_eq!(tags.len(), 48);
-        let (tets, tags) = reader.read_tetrahedra::<[u32; 4], i16>().unwrap();
+        let (tets, _) = to_vecs(reader.read_tetrahedra().unwrap());
         assert_eq!(tets.len(), 40);
-        assert_eq!(tags.len(), 40);
     }
 
     #[test]
     #[should_panic]
     fn test_read_ascii_3d_sol() {
         let mut reader = MeshbReader::new("./data/sol3d_scalar.sol").unwrap();
-        let _ = reader.read_vertices::<[f64; 3], ()>().unwrap();
+        let _ = reader.read_vertices::<3>().unwrap();
     }
 
     #[test]
     #[should_panic]
     fn test_read_ascii_3d_sol_2() {
         let mut reader = MeshbReader::new("./data/sol3d_scalar.sol").unwrap();
-        let _ = reader.read_solution::<[f32; 3]>().unwrap();
+        let _ = reader.read_solution::<3>().unwrap();
     }
 
     #[test]
     fn test_read_ascii_3d_sol_3() {
         let mut reader = MeshbReader::new("./data/sol3d_scalar.sol").unwrap();
-        let sol = reader.read_solution::<f32>().unwrap();
+        let sol = reader.read_solution::<1>().unwrap();
         assert_eq!(sol.len(), 26);
     }
 
     #[test]
     fn test_read_ascii_3d_sol_4() {
         let mut reader = MeshbReader::new("./data/sol3d_vec.sol").unwrap();
-        let sol = reader.read_solution::<[f32; 3]>().unwrap();
+        let sol = reader.read_solution::<3>().unwrap();
         assert_eq!(sol.len(), 26);
     }
 
@@ -425,41 +435,39 @@ mod tests {
 
         assert_eq!(reader.dimension(), 3);
 
-        let (verts, _) = reader.read_vertices::<[f64; 3], ()>().unwrap();
+        let (verts, _) = to_vecs(reader.read_vertices::<3>().unwrap());
         assert_eq!(verts.len(), 26);
-        let (tris, tags) = reader.read_triangles::<[u32; 3], i16>().unwrap();
+        let (tris, _) = to_vecs(reader.read_triangles().unwrap());
         assert_eq!(tris.len(), 48);
-        assert_eq!(tags.len(), 48);
-        let (tets, tags) = reader.read_tetrahedra::<[u32; 4], i16>().unwrap();
+        let (tets, _) = to_vecs(reader.read_tetrahedra().unwrap());
         assert_eq!(tets.len(), 40);
-        assert_eq!(tags.len(), 40);
     }
 
     #[test]
     #[should_panic]
     fn test_read_binary_3d_sol() {
         let mut reader = MeshbReader::new("./data/sol3d_scalar.solb").unwrap();
-        let _ = reader.read_vertices::<[f64; 3], ()>().unwrap();
+        let _ = reader.read_vertices::<3>().unwrap();
     }
 
     #[test]
     #[should_panic]
     fn test_read_binary_3d_sol_2() {
         let mut reader = MeshbReader::new("./data/sol3d_scalar.solb").unwrap();
-        let _ = reader.read_solution::<[f32; 3]>().unwrap();
+        let _ = reader.read_solution::<3>().unwrap();
     }
 
     #[test]
     fn test_read_binary_3d_sol_3() {
         let mut reader = MeshbReader::new("./data/sol3d_scalar.solb").unwrap();
-        let sol = reader.read_solution::<f32>().unwrap();
+        let sol = reader.read_solution::<1>().unwrap();
         assert_eq!(sol.len(), 26);
     }
 
     #[test]
     fn test_read_binary_3d_sol_4() {
         let mut reader = MeshbReader::new("./data/sol3d_vec.solb").unwrap();
-        let sol = reader.read_solution::<[f32; 3]>().unwrap();
+        let sol = reader.read_solution::<3>().unwrap();
         assert_eq!(sol.len(), 26);
     }
 
@@ -468,38 +476,32 @@ mod tests {
         let mut areader = MeshbReader::new("./data/mesh3d.mesh").unwrap();
         let mut breader = MeshbReader::new("./data/mesh3d.meshb").unwrap();
 
-        let (averts, _) = areader.read_vertices::<[f64; 3], ()>().unwrap();
-        let (bverts, _) = breader.read_vertices::<[f64; 3], ()>().unwrap();
+        let averts = areader.read_vertices::<3>().unwrap();
+        let bverts = breader.read_vertices::<3>().unwrap();
 
-        for (vert0, vert1) in averts.iter().zip(bverts.iter()) {
+        for ((vert0, _), (vert1, _)) in averts.zip(bverts) {
             for (v0, v1) in vert0.iter().zip(vert1.iter()) {
                 assert!((v0 - v1).abs() < 1e-6);
             }
         }
 
-        let (atris, atags) = areader.read_triangles::<[u32; 3], i16>().unwrap();
-        let (btris, btags) = breader.read_triangles::<[u32; 3], i16>().unwrap();
+        let atris = areader.read_triangles().unwrap();
+        let btris = breader.read_triangles().unwrap();
 
-        for (tri0, tri1) in atris.iter().zip(btris.iter()) {
+        for ((tri0, tag0), (tri1, tag1)) in atris.zip(btris) {
             for (v0, v1) in tri0.iter().zip(tri1.iter()) {
                 assert_eq!(v0, v1);
             }
-        }
-
-        for (tag0, tag1) in atags.iter().zip(btags.iter()) {
             assert_eq!(tag0, tag1);
         }
 
-        let (atets, atags) = areader.read_tetrahedra::<[u32; 4], i16>().unwrap();
-        let (btets, btags) = breader.read_tetrahedra::<[u32; 4], i16>().unwrap();
+        let atets = areader.read_tetrahedra().unwrap();
+        let btets = breader.read_tetrahedra().unwrap();
 
-        for (tet0, tet1) in atets.iter().zip(btets.iter()) {
+        for ((tet0, tag0), (tet1, tag1)) in atets.zip(btets) {
             for (v0, v1) in tet0.iter().zip(tet1.iter()) {
                 assert_eq!(v0, v1);
             }
-        }
-
-        for (tag0, tag1) in atags.iter().zip(btags.iter()) {
             assert_eq!(tag0, tag1);
         }
     }
@@ -509,14 +511,14 @@ mod tests {
         let mut reader = MeshbReader::new("./data/mesh2d.mesh").unwrap();
         assert_eq!(reader.dimension(), 2);
 
-        let (verts, _) = reader.read_vertices::<[f64; 2], ()>().unwrap();
+        let (verts, _) = to_vecs(reader.read_vertices::<2>().unwrap());
         assert_eq!(verts.len(), 9);
-        let (edgs, tags) = reader.read_edges::<[u32; 2], i16>().unwrap();
+        let (edgs, tags) = to_vecs(reader.read_edges().unwrap());
         assert_eq!(edgs.len(), 10);
         assert_eq!(tags.len(), 10);
         assert_eq!(tags, [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
 
-        let (tris, tags) = reader.read_triangles::<[u32; 3], i16>().unwrap();
+        let (tris, tags) = to_vecs(reader.read_triangles().unwrap());
         assert_eq!(tris.len(), 8);
         assert_eq!(tags.len(), 8);
         assert_eq!(tags, [1, 1, 1, 1, 2, 2, 2, 2]);
@@ -526,27 +528,27 @@ mod tests {
     #[should_panic]
     fn test_read_ascii_2d_sol() {
         let mut reader = MeshbReader::new("./data/sol2d_scalar.sol").unwrap();
-        let _ = reader.read_vertices::<[f64; 2], ()>().unwrap();
+        let _ = reader.read_vertices::<2>().unwrap();
     }
 
     #[test]
     #[should_panic]
     fn test_read_ascii_2d_sol_2() {
         let mut reader = MeshbReader::new("./data/sol2d_scalar.sol").unwrap();
-        let _ = reader.read_solution::<[f32; 2]>().unwrap();
+        let _ = reader.read_solution::<2>().unwrap();
     }
 
     #[test]
     fn test_read_ascii_2d_sol_3() {
         let mut reader = MeshbReader::new("./data/sol2d_scalar.sol").unwrap();
-        let sol = reader.read_solution::<f32>().unwrap();
+        let sol = reader.read_solution::<1>().unwrap();
         assert_eq!(sol.len(), 9);
     }
 
     #[test]
     fn test_read_ascii_2d_sol_4() {
         let mut reader = MeshbReader::new("./data/sol2d_vec.sol").unwrap();
-        let sol = reader.read_solution::<[f32; 2]>().unwrap();
+        let sol = reader.read_solution::<2>().unwrap();
         assert_eq!(sol.len(), 9);
     }
 
@@ -555,14 +557,14 @@ mod tests {
         let mut reader = MeshbReader::new("./data/mesh2d.meshb").unwrap();
         assert_eq!(reader.dimension(), 2);
 
-        let (verts, _) = reader.read_vertices::<[f64; 2], ()>().unwrap();
+        let (verts, _) = to_vecs(reader.read_vertices::<2>().unwrap());
         assert_eq!(verts.len(), 9);
-        let (edgs, tags) = reader.read_edges::<[u32; 2], i16>().unwrap();
+        let (edgs, tags) = to_vecs(reader.read_edges().unwrap());
         assert_eq!(edgs.len(), 10);
         assert_eq!(tags.len(), 10);
         assert_eq!(tags, [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
 
-        let (tris, tags) = reader.read_triangles::<[u32; 3], i16>().unwrap();
+        let (tris, tags) = to_vecs(reader.read_triangles().unwrap());
         assert_eq!(tris.len(), 8);
         assert_eq!(tags.len(), 8);
         assert_eq!(tags, [1, 1, 1, 1, 2, 2, 2, 2]);
@@ -572,27 +574,27 @@ mod tests {
     #[should_panic]
     fn test_read_binary_2d_sol() {
         let mut reader = MeshbReader::new("./data/sol2d_scalar.solb").unwrap();
-        let _ = reader.read_vertices::<[f64; 3], ()>().unwrap();
+        let _ = reader.read_vertices::<3>().unwrap();
     }
 
     #[test]
     #[should_panic]
     fn test_read_binary_2d_sol_2() {
         let mut reader = MeshbReader::new("./data/sol2d_scalar.solb").unwrap();
-        let _ = reader.read_solution::<[f32; 3]>().unwrap();
+        let _ = reader.read_solution::<3>().unwrap();
     }
 
     #[test]
     fn test_read_binary_2d_sol_3() {
         let mut reader = MeshbReader::new("./data/sol2d_scalar.solb").unwrap();
-        let sol = reader.read_solution::<f32>().unwrap();
+        let sol = reader.read_solution::<1>().unwrap();
         assert_eq!(sol.len(), 9);
     }
 
     #[test]
     fn test_read_binary_2d_sol_4() {
         let mut reader = MeshbReader::new("./data/sol2d_vec.solb").unwrap();
-        let sol = reader.read_solution::<[f32; 2]>().unwrap();
+        let sol = reader.read_solution::<2>().unwrap();
         assert_eq!(sol.len(), 9);
     }
 
@@ -601,38 +603,32 @@ mod tests {
         let mut areader = MeshbReader::new("./data/mesh2d.mesh").unwrap();
         let mut breader = MeshbReader::new("./data/mesh2d.meshb").unwrap();
 
-        let (averts, _) = areader.read_vertices::<[f64; 2], ()>().unwrap();
-        let (bverts, _) = breader.read_vertices::<[f64; 2], ()>().unwrap();
+        let averts = areader.read_vertices::<2>().unwrap();
+        let bverts = breader.read_vertices::<2>().unwrap();
 
-        for (vert0, vert1) in averts.iter().zip(bverts.iter()) {
+        for ((vert0, _), (vert1, _)) in averts.zip(bverts) {
             for (v0, v1) in vert0.iter().zip(vert1.iter()) {
                 assert!((v0 - v1).abs() < 1e-6);
             }
         }
 
-        let (aedgs, atags) = areader.read_edges::<[u32; 2], i16>().unwrap();
-        let (bedgs, btags) = breader.read_edges::<[u32; 2], i16>().unwrap();
+        let aedgs = areader.read_edges().unwrap();
+        let bedgs = breader.read_edges().unwrap();
 
-        for (edg0, edg1) in aedgs.iter().zip(bedgs.iter()) {
+        for ((edg0, tag0), (edg1, tag1)) in aedgs.zip(bedgs) {
             for (v0, v1) in edg0.iter().zip(edg1.iter()) {
                 assert_eq!(v0, v1);
             }
-        }
-
-        for (tag0, tag1) in atags.iter().zip(btags.iter()) {
             assert_eq!(tag0, tag1);
         }
 
-        let (atris, atags) = areader.read_triangles::<[u32; 3], i16>().unwrap();
-        let (btris, btags) = breader.read_triangles::<[u32; 3], i16>().unwrap();
+        let atris = areader.read_triangles().unwrap();
+        let btris = breader.read_triangles().unwrap();
 
-        for (tri0, tri1) in atris.iter().zip(btris.iter()) {
+        for ((tri0, tag0), (tri1, tag1)) in atris.zip(btris) {
             for (v0, v1) in tri0.iter().zip(tri1.iter()) {
                 assert_eq!(v0, v1);
             }
-        }
-
-        for (tag0, tag1) in atags.iter().zip(btags.iter()) {
             assert_eq!(tag0, tag1);
         }
     }
