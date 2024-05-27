@@ -297,6 +297,7 @@ impl MeshbReader {
     }
 
     pub fn get_solution_size(&mut self) -> Result<usize> {
+        let _ = self.goto_section("SolAtVertices")?;
         let m: i16;
         if self.is_binary {
             let n_fields = self.read_kwd();
