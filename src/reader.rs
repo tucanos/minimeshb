@@ -198,6 +198,10 @@ impl MeshbReader {
         Err(Error::from(&format!("Unable to get section {kwd}")))
     }
 
+    pub fn n_verts(&mut self) -> Result<usize> {
+        self.goto_section("Vertices")
+    }
+
     pub fn read_vertices<const D: usize>(
         &mut self,
     ) -> Result<impl ExactSizeIterator<Item = ([f64; D], i32)> + '_> {
@@ -234,6 +238,10 @@ impl MeshbReader {
             }
             (vals, tag)
         }))
+    }
+
+    pub fn n_elements(&mut self, kwd: &str) -> Result<usize> {
+        self.goto_section(kwd)
     }
 
     fn read_elements<const N: usize>(
@@ -296,8 +304,8 @@ impl MeshbReader {
         self.read_elements("Tetrahedra")
     }
 
-    pub fn get_solution_size(&mut self) -> Result<usize> {
-        let _ = self.goto_section("SolAtVertices")?;
+    pub fn get_solution_size(&mut self) -> Result<(usize, usize)> {
+        let n = self.goto_section("SolAtVertices")?;
         let m: i16;
         if self.is_binary {
             let n_fields = self.read_kwd();
@@ -320,9 +328,9 @@ impl MeshbReader {
             }
         }
         match m {
-            1 => Ok(1),
-            2 => Ok(self.dimension as usize),
-            3 => Ok((self.dimension * (self.dimension + 1) / 2) as usize),
+            1 => Ok((n, 1)),
+            2 => Ok((n, self.dimension as usize)),
+            3 => Ok((n, (self.dimension * (self.dimension + 1) / 2) as usize)),
             _ => Err(Error::from(&format!("Unvalid field type {m}"))),
         }
     }
@@ -330,8 +338,7 @@ impl MeshbReader {
     pub fn read_solution<const N: usize>(
         &mut self,
     ) -> Result<impl ExactSizeIterator<Item = [f64; N]> + '_> {
-        let n_verts = self.goto_section("SolAtVertices")?;
-        let m = self.get_solution_size()?;
+        let (n_verts, m) = self.get_solution_size()?;
         assert_eq!(N, m);
 
         debug!("read field");
