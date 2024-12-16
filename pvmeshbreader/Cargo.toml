@@ -1,0 +1,12 @@
+[package]
+name = "pvmeshbreader"
+version = "0.1.0"
+edition = "2021"
+description = "C / FFI wrapper for the meshb reader"
+
+[lib]
+name = "meshbreader"
+crate-type = ["cdylib"]
+
+[dependencies]
+minimeshb = { path = ".." }

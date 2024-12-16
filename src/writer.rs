@@ -43,7 +43,7 @@ impl MeshbWriter {
             writer: BufWriter::new(file),
         };
 
-        writeln!(res.writer, "MeshVersionFormatted 1")?;
+        writeln!(res.writer, "MeshVersionFormatted {version}")?;
         writeln!(res.writer, "Dimension {dimension}")?;
 
         Ok(res)
