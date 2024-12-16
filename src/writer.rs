@@ -61,12 +61,48 @@ impl MeshbWriter {
         }
     }
 
-    fn write_index(&mut self, v: u64) {
-        if self.version < 4 {
-            self.writer.write_all(&(v as u32).to_le_bytes()).unwrap();
-        } else {
+    fn write_pos(&mut self, v: i64) {
+        if self.version >= 3 {
             self.writer.write_all(&v.to_le_bytes()).unwrap();
+        } else {
+            self.writer.write_all(&(v as i32).to_le_bytes()).unwrap();
         }
+    }
+
+    fn write_index(&mut self, v: i64) {
+        if self.version == 4 {
+            self.writer.write_all(&v.to_le_bytes()).unwrap();
+        } else {
+            self.writer.write_all(&(v as i32).to_le_bytes()).unwrap();
+        }
+    }
+
+    fn size_of_float(&self) -> u64 {
+        if self.version == 1 {
+            std::mem::size_of::<f32>() as u64
+        } else {
+            std::mem::size_of::<f64>() as u64
+        }
+    }
+
+    fn size_of_pos(&self) -> u64 {
+        if self.version >= 3 {
+            std::mem::size_of::<i64>() as u64
+        } else {
+            std::mem::size_of::<i32>() as u64
+        }
+    }
+
+    fn size_of_index(&self) -> u64 {
+        if self.version == 4 {
+            std::mem::size_of::<u64>() as u64
+        } else {
+            std::mem::size_of::<i32>() as u64
+        }
+    }
+
+    fn size_of_kwd(&self) -> u64 {
+        std::mem::size_of::<i32>() as u64
     }
 
     fn new_binary(fname: &str, version: u8, dimension: u8) -> Result<Self> {
@@ -86,13 +122,9 @@ impl MeshbWriter {
 
         res.write_kwd(3); // Dimension
         let mut next = res.writer.stream_position().unwrap();
-        next += if res.version >= 3 {
-            std::mem::size_of::<u64>() as u64
-        } else {
-            std::mem::size_of::<u32>() as u64
-        }; // Next
-        next += std::mem::size_of::<i32>() as u64; // Dimension
-        res.write_index(next);
+        next += res.size_of_pos(); // Next
+        next += res.size_of_kwd(); // Dimension
+        res.write_pos(next as i64);
         res.write_kwd(dimension as i32);
         Ok(res)
     }
@@ -100,7 +132,7 @@ impl MeshbWriter {
     pub fn close(mut self) {
         if self.is_binary {
             self.write_kwd(54);
-            self.write_index(0);
+            self.write_pos(0);
         } else {
             writeln!(self.writer, "End").unwrap();
         }
@@ -162,23 +194,14 @@ impl MeshbWriter {
     ) -> Result<()> {
         let mut next = self.writer.stream_position().unwrap();
         next += std::mem::size_of::<i32>() as u64; // Keyword
-        next += 2 * if self.version >= 3 {
-            std::mem::size_of::<u64>() as u64
-        } else {
-            std::mem::size_of::<u32>() as u64
-        }; // Next + Size
-        next += self.dimension as u64
-            * verts.len() as u64
-            * if self.version == 1 {
-                std::mem::size_of::<f32>() as u64
-            } else {
-                std::mem::size_of::<f64>() as u64
-            }; // Coordinates
-        next += verts.len() as u64 * std::mem::size_of::<i32>() as u64; // Tags
+        next += self.size_of_pos();
+        next += self.size_of_index();
+        next += self.dimension as u64 * verts.len() as u64 * self.size_of_float(); // Coordinates
+        next += verts.len() as u64 * self.size_of_kwd(); // Tags
 
         self.write_kwd(4);
-        self.write_index(next);
-        self.write_index(verts.len() as u64);
+        self.write_pos(next as i64);
+        self.write_index(verts.len() as i64);
 
         for (v, t) in verts.zip(tags) {
             for x in v {
@@ -192,7 +215,7 @@ impl MeshbWriter {
 
     fn write_elements<
         const N: usize,
-        I1: ExactSizeIterator<Item = [u64; N]>,
+        I1: ExactSizeIterator<Item = [usize; N]>,
         I2: ExactSizeIterator<Item = i32>,
     >(
         &mut self,
@@ -212,7 +235,7 @@ impl MeshbWriter {
 
     fn write_elements_ascii<
         const N: usize,
-        I1: ExactSizeIterator<Item = [u64; N]>,
+        I1: ExactSizeIterator<Item = [usize; N]>,
         I2: ExactSizeIterator<Item = i32>,
     >(
         &mut self,
@@ -247,7 +270,7 @@ impl MeshbWriter {
 
     fn write_elements_binary<
         const N: usize,
-        I1: ExactSizeIterator<Item = [u64; N]>,
+        I1: ExactSizeIterator<Item = [usize; N]>,
         I2: ExactSizeIterator<Item = i32>,
     >(
         &mut self,
@@ -264,36 +287,27 @@ impl MeshbWriter {
 
         let mut next = self.writer.stream_position().unwrap();
         next += std::mem::size_of::<i32>() as u64; // Keyword
-        next += 2 * if self.version >= 3 {
-            std::mem::size_of::<u64>() as u64
-        } else {
-            std::mem::size_of::<u32>() as u64
-        }; // Next + Size
-        next += m
-            * elems.len() as u64
-            * if self.version >= 3 {
-                std::mem::size_of::<u64>() as u64
-            } else {
-                std::mem::size_of::<u32>() as u64
-            }; // Coordinates
-        next += elems.len() as u64 * std::mem::size_of::<i32>() as u64; // Tags
+        next += self.size_of_pos();
+        next += self.size_of_index();
+        next += m * elems.len() as u64 * self.size_of_index(); // Coordinates
+        next += elems.len() as u64 * self.size_of_index(); // Tags
 
         self.write_kwd(kwd);
-        self.write_index(next);
-        self.write_index(elems.len() as u64);
+        self.write_pos(next as i64);
+        self.write_index(elems.len() as i64);
 
         for (v, t) in elems.zip(tags) {
             for x in v {
-                self.write_index(x + 1);
+                self.write_index(x as i64 + 1);
             }
-            self.write_kwd(t);
+            self.write_index(t as i64);
         }
 
         Ok(())
     }
 
     pub fn write_edges<
-        I1: ExactSizeIterator<Item = [u64; 2]>,
+        I1: ExactSizeIterator<Item = [usize; 2]>,
         I2: ExactSizeIterator<Item = i32>,
     >(
         &mut self,
@@ -304,7 +318,7 @@ impl MeshbWriter {
     }
 
     pub fn write_triangles<
-        I1: ExactSizeIterator<Item = [u64; 3]>,
+        I1: ExactSizeIterator<Item = [usize; 3]>,
         I2: ExactSizeIterator<Item = i32>,
     >(
         &mut self,
@@ -315,7 +329,7 @@ impl MeshbWriter {
     }
 
     pub fn write_tetrahedra<
-        I1: ExactSizeIterator<Item = [u64; 4]>,
+        I1: ExactSizeIterator<Item = [usize; 4]>,
         I2: ExactSizeIterator<Item = i32>,
     >(
         &mut self,
@@ -376,24 +390,15 @@ impl MeshbWriter {
         sols: I,
     ) -> Result<()> {
         let mut next = self.writer.stream_position().unwrap();
-        next += std::mem::size_of::<i32>() as u64; // Keyword
-        next += 2 * if self.version >= 3 {
-            std::mem::size_of::<u64>() as u64
-        } else {
-            std::mem::size_of::<u32>() as u64
-        }; // Next + Size
-        next += 2 * std::mem::size_of::<u32>() as u64; // field type
-        next += N as u64
-            * sols.len() as u64
-            * if self.version == 1 {
-                std::mem::size_of::<f32>() as u64
-            } else {
-                std::mem::size_of::<f64>() as u64
-            }; // Values
+        next += self.size_of_kwd(); // Keyword
+        next += self.size_of_pos();
+        next += self.size_of_index();
+        next += 2 * self.size_of_kwd(); // field type
+        next += N as u64 * sols.len() as u64 * self.size_of_float(); // Values
 
         self.write_kwd(62);
-        self.write_index(next);
-        self.write_index(sols.len() as u64);
+        self.write_pos(next as i64);
+        self.write_index(sols.len() as i64);
         self.write_kwd(1);
         self.write_kwd(self.get_solution_type::<N>()? as i32);
 

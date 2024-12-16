@@ -111,15 +111,27 @@ impl MeshbReader {
         }
     }
 
-    fn read_index(&mut self) -> u64 {
+    fn read_pos(&mut self) -> i64 {
         if self.version >= 3 {
-            let mut buffer = [0u8; std::mem::size_of::<u64>()];
+            let mut buffer = [0u8; std::mem::size_of::<i64>()];
             self.reader.read_exact(&mut buffer).unwrap();
-            u64::from_le_bytes(buffer)
+            i64::from_le_bytes(buffer)
         } else {
-            let mut buffer = [0u8; std::mem::size_of::<u32>()];
+            let mut buffer = [0u8; std::mem::size_of::<i32>()];
             self.reader.read_exact(&mut buffer).unwrap();
-            u32::from_le_bytes(buffer) as u64
+            i32::from_le_bytes(buffer) as i64
+        }
+    }
+
+    fn read_index(&mut self) -> i64 {
+        if self.version == 4 {
+            let mut buffer = [0u8; std::mem::size_of::<i64>()];
+            self.reader.read_exact(&mut buffer).unwrap();
+            i64::from_le_bytes(buffer)
+        } else {
+            let mut buffer = [0u8; std::mem::size_of::<i32>()];
+            self.reader.read_exact(&mut buffer).unwrap();
+            i32::from_le_bytes(buffer) as i64
         }
     }
 
@@ -147,7 +159,7 @@ impl MeshbReader {
 
         let kwd = res.read_kwd() as u8;
         assert_eq!(kwd, 3); // Dimension
-        let mut next_offset = res.read_index();
+        let mut next_offset = res.read_pos() as u64;
         res.dimension = res.read_kwd() as u8;
         debug!("dimension = {}", res.dimension);
 
@@ -170,7 +182,7 @@ impl MeshbReader {
             }
             res.offsets
                 .insert(String::from(name), res.reader.stream_position().unwrap());
-            next_offset = res.read_index();
+            next_offset = res.read_pos() as u64;
         }
 
         Ok(res)
@@ -181,7 +193,7 @@ impl MeshbReader {
             self.reader.seek(SeekFrom::Start(*offset))?;
 
             if self.is_binary {
-                let _ = self.read_index();
+                let _ = self.read_pos();
                 let n = self.read_index();
                 return Ok(n as usize);
             } else {
@@ -239,7 +251,7 @@ impl MeshbReader {
     fn read_elements<const N: usize>(
         &mut self,
         kwd: &str,
-    ) -> Result<impl ExactSizeIterator<Item = ([u64; N], i32)> + '_> {
+    ) -> Result<impl ExactSizeIterator<Item = ([usize; N], i32)> + '_> {
         let m = match kwd {
             "Edges" => 2,
             "Triangles" => 3,
@@ -251,16 +263,16 @@ impl MeshbReader {
         let n_elems = self.goto_section(kwd)?;
         debug!("read {n_elems} elements");
 
-        let mut vals = [0_u64; N];
+        let mut vals = [0_usize; N];
         let mut tag = -1;
         let mut line = String::new();
 
         Ok((0..n_elems).map(move |_| {
             if self.is_binary {
                 for v in vals.iter_mut() {
-                    *v = self.read_index() - 1;
+                    *v = self.read_index() as usize - 1;
                 }
-                tag = self.read_kwd();
+                tag = self.read_index() as i32;
             } else {
                 let len = self.reader.read_line(&mut line).unwrap();
                 assert_ne!(len, 0);
@@ -268,7 +280,7 @@ impl MeshbReader {
                 assert!(!trimmed_line.is_empty());
                 for (i, v) in trimmed_line.split(' ').enumerate() {
                     if i < N {
-                        vals[i] = v.parse::<u64>().unwrap() - 1;
+                        vals[i] = v.parse::<usize>().unwrap() - 1;
                     }
                     if i == N {
                         tag = v.parse().unwrap();
@@ -280,19 +292,19 @@ impl MeshbReader {
         }))
     }
 
-    pub fn read_edges(&mut self) -> Result<impl ExactSizeIterator<Item = ([u64; 2], i32)> + '_> {
+    pub fn read_edges(&mut self) -> Result<impl ExactSizeIterator<Item = ([usize; 2], i32)> + '_> {
         self.read_elements("Edges")
     }
 
     pub fn read_triangles(
         &mut self,
-    ) -> Result<impl ExactSizeIterator<Item = ([u64; 3], i32)> + '_> {
+    ) -> Result<impl ExactSizeIterator<Item = ([usize; 3], i32)> + '_> {
         self.read_elements("Triangles")
     }
 
     pub fn read_tetrahedra(
         &mut self,
-    ) -> Result<impl ExactSizeIterator<Item = ([u64; 4], i32)> + '_> {
+    ) -> Result<impl ExactSizeIterator<Item = ([usize; 4], i32)> + '_> {
         self.read_elements("Tetrahedra")
     }
 
