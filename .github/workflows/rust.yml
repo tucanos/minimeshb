@@ -8,15 +8,47 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  LIBMESHB_DIR: /opt/libMeshB
+  LIBMESHB_COMMIT: v7.60
 
 jobs:
+  libmeshb:
+    runs-on: ubuntu-latest
+    steps:
+    - id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.LIBMESHB_DIR }}
+        key: libmeshb-${{ env.LIBMESHB_COMMIT }}
+    - if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      name: build
+      run: |
+        curl -Ls https://github.com/LoicMarechal/libMeshb/archive/${{ env.LIBMESHB_COMMIT }}.tar.gz | tar xz
+        cd libMeshb*
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=${{ env.LIBMESHB_DIR }} .
+        make -j$(nproc) install
+        
   build:
-
+    needs: [libmeshb]
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
+    - name: libMeshB cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.LIBMESHB_DIR }}
+        key: libmeshb-${{ env.LIBMESHB_COMMIT }}
+    - name: Run clippy
+      uses: clechasseur/rs-clippy-check@v3
+    - run: cargo fmt --check --all
     - name: Run tests
-      run: cargo test --verbose
+      uses: clechasseur/rs-cargo@v2
+      with:
+        command: test 
+        args: --no-default-features 
+    - name: Run tests (libmeshb)
+      uses: clechasseur/rs-cargo@v2
+      with:
+        command: test 
+        args: --no-default-features --features=libmeshb-sys

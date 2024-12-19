@@ -1,6 +1,7 @@
+#[cfg(feature = "libmeshb-sys")]
+pub mod libmeshb;
 pub mod reader;
 pub mod writer;
-
 use core::fmt;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
