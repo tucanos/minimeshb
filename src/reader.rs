@@ -228,7 +228,7 @@ impl MeshbReader {
                 for v in vals.iter_mut() {
                     *v = self.read_float();
                 }
-                tag = self.read_kwd();
+                tag = self.read_index() as i32;
             } else {
                 let len = self.reader.read_line(&mut line).unwrap();
                 assert_ne!(len, 0);
@@ -387,6 +387,12 @@ impl MeshbReader {
 #[cfg(test)]
 mod tests {
     use super::MeshbReader;
+    #[cfg(feature = "libmeshb-sys")]
+    use crate::libmeshb::GmfWriter;
+    #[cfg(feature = "libmeshb-sys")]
+    use rand::{rngs::StdRng, Rng, SeedableRng};
+    #[cfg(feature = "libmeshb-sys")]
+    use tempfile::NamedTempFile;
 
     fn to_vecs<const N: usize, T, I: ExactSizeIterator<Item = ([T; N], i32)>>(
         it: I,
@@ -644,5 +650,267 @@ mod tests {
             }
             assert_eq!(tag0, tag1);
         }
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    fn test_libmeshb_3d(version: u8, binary: bool) {
+        let mut rng = StdRng::seed_from_u64(1234);
+
+        let n_verts = 100;
+        let n_elems = 200;
+        let n_faces = 50;
+
+        let verts = (0..n_verts)
+            .map(|_| {
+                [
+                    rng.gen::<f64>() - 0.5,
+                    rng.gen::<f64>() - 0.5,
+                    rng.gen::<f64>() - 0.5,
+                ]
+            })
+            .collect::<Vec<_>>();
+
+        let elems = (0..n_elems)
+            .map(|_| {
+                [
+                    rng.gen_range(0..n_verts) as usize,
+                    rng.gen_range(0..n_verts) as usize,
+                    rng.gen_range(0..n_verts) as usize,
+                    rng.gen_range(0..n_verts) as usize,
+                ]
+            })
+            .collect::<Vec<_>>();
+        let etags = (0..n_elems)
+            .map(|_| rng.gen_range(0..10) as i32)
+            .collect::<Vec<_>>();
+
+        let faces = (0..n_faces)
+            .map(|_| {
+                [
+                    rng.gen_range(0..n_verts) as usize,
+                    rng.gen_range(0..n_verts) as usize,
+                    rng.gen_range(0..n_verts) as usize,
+                ]
+            })
+            .collect::<Vec<_>>();
+        let ftags: Vec<i32> = (0..n_faces)
+            .map(|_| rng.gen_range(0..10) as i32)
+            .collect::<Vec<_>>();
+
+        let file = NamedTempFile::new().unwrap();
+        let fname = if binary {
+            file.path().to_str().unwrap().to_owned() + ".meshb"
+        } else {
+            file.path().to_str().unwrap().to_owned() + ".mesh"
+        };
+
+        let mut writer = GmfWriter::new(&fname, version, 3).unwrap();
+        writer
+            .write_vertices(verts.iter().cloned(), verts.iter().map(|_| 1))
+            .unwrap();
+        writer
+            .write_tetrahedra(elems.iter().cloned(), etags.iter().cloned())
+            .unwrap();
+        writer
+            .write_triangles(faces.iter().cloned(), ftags.iter().cloned())
+            .unwrap();
+        writer.close();
+
+        let mut reader = MeshbReader::new(&fname).unwrap();
+        for (i, (vert, tag)) in reader.read_vertices::<3>().unwrap().enumerate() {
+            assert_eq!(tag, 1);
+            for j in 0..3 {
+                assert!((vert[j] - verts[i][j]).abs() < 1e-5);
+            }
+        }
+
+        for (i, (elem, tag)) in reader.read_tetrahedra().unwrap().enumerate() {
+            assert_eq!(tag, etags[i]);
+            for j in 0..4 {
+                assert_eq!(elem[j], elems[i][j]);
+            }
+        }
+
+        for (i, (face, tag)) in reader.read_triangles().unwrap().enumerate() {
+            assert_eq!(tag, ftags[i]);
+            for j in 0..3 {
+                assert_eq!(face[j], faces[i][j]);
+            }
+        }
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_3d_ascii_1() {
+        test_libmeshb_3d(1, false)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_3d_ascii_2() {
+        test_libmeshb_3d(2, false)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_3d_ascii_3() {
+        test_libmeshb_3d(3, false)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_3d_ascii_4() {
+        test_libmeshb_3d(4, false)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_3d_binary_1() {
+        test_libmeshb_3d(1, true)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_3d_binary_2() {
+        test_libmeshb_3d(2, true)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_3d_binary_3() {
+        test_libmeshb_3d(3, true)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_3d_binary_4() {
+        test_libmeshb_3d(4, true)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    fn test_libmeshb_2d(version: u8, binary: bool) {
+        let mut rng = StdRng::seed_from_u64(1234);
+
+        let n_verts = 100;
+        let n_elems = 200;
+        let n_faces = 50;
+
+        let verts = (0..n_verts)
+            .map(|_| [rng.gen::<f64>() - 0.5, rng.gen::<f64>() - 0.5])
+            .collect::<Vec<_>>();
+
+        let elems = (0..n_elems)
+            .map(|_| {
+                [
+                    rng.gen_range(0..n_verts) as usize,
+                    rng.gen_range(0..n_verts) as usize,
+                    rng.gen_range(0..n_verts) as usize,
+                ]
+            })
+            .collect::<Vec<_>>();
+        let etags = (0..n_elems)
+            .map(|_| rng.gen_range(0..10) as i32)
+            .collect::<Vec<_>>();
+
+        let faces = (0..n_faces)
+            .map(|_| {
+                [
+                    rng.gen_range(0..n_verts) as usize,
+                    rng.gen_range(0..n_verts) as usize,
+                ]
+            })
+            .collect::<Vec<_>>();
+        let ftags: Vec<i32> = (0..n_faces)
+            .map(|_| rng.gen_range(0..10) as i32)
+            .collect::<Vec<_>>();
+
+        let file = NamedTempFile::new().unwrap();
+        let fname = if binary {
+            file.path().to_str().unwrap().to_owned() + ".meshb"
+        } else {
+            file.path().to_str().unwrap().to_owned() + ".mesh"
+        };
+
+        let mut writer = GmfWriter::new(&fname, version, 2).unwrap();
+        writer
+            .write_vertices(verts.iter().cloned(), verts.iter().map(|_| 1))
+            .unwrap();
+        writer
+            .write_triangles(elems.iter().cloned(), etags.iter().cloned())
+            .unwrap();
+        writer
+            .write_edges(faces.iter().cloned(), ftags.iter().cloned())
+            .unwrap();
+        writer.close();
+
+        let mut reader = MeshbReader::new(&fname).unwrap();
+        for (i, (vert, tag)) in reader.read_vertices::<2>().unwrap().enumerate() {
+            assert_eq!(tag, 1);
+            for j in 0..2 {
+                assert!((vert[j] - verts[i][j]).abs() < 1e-5);
+            }
+        }
+
+        for (i, (elem, tag)) in reader.read_triangles().unwrap().enumerate() {
+            assert_eq!(tag, etags[i]);
+            for j in 0..3 {
+                assert_eq!(elem[j], elems[i][j]);
+            }
+        }
+
+        for (i, (face, tag)) in reader.read_edges().unwrap().enumerate() {
+            assert_eq!(tag, ftags[i]);
+            for j in 0..2 {
+                assert_eq!(face[j], faces[i][j]);
+            }
+        }
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_2d_ascii_1() {
+        test_libmeshb_2d(1, false)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_2d_ascii_2() {
+        test_libmeshb_2d(2, false)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_2d_ascii_3() {
+        test_libmeshb_2d(3, false)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_2d_ascii_4() {
+        test_libmeshb_2d(4, false)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_2d_binary_1() {
+        test_libmeshb_2d(1, true)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_2d_binary_2() {
+        test_libmeshb_2d(2, true)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_2d_binary_3() {
+        test_libmeshb_2d(3, true)
+    }
+
+    #[cfg(feature = "libmeshb-sys")]
+    #[test]
+    fn test_libmeshb_2d_binary_4() {
+        test_libmeshb_2d(4, true)
     }
 }
