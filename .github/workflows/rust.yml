@@ -43,12 +43,12 @@ jobs:
       uses: clechasseur/rs-clippy-check@v4
     - run: cargo fmt --check --all
     - name: Run tests
-      uses: clechasseur/rs-cargo@v2
+      uses: clechasseur/rs-cargo@v3
       with:
         command: test 
         args: --no-default-features 
     - name: Run tests (libmeshb)
-      uses: clechasseur/rs-cargo@v2
+      uses: clechasseur/rs-cargo@v3
       with:
         command: test 
         args: --no-default-features --features=libmeshb-sys
