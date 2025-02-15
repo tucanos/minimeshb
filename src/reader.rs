@@ -65,7 +65,14 @@ impl MeshbReader {
                 debug!("version = {version}");
             } else if trimmed_line.starts_with("Dimension") {
                 let line = trimmed_line.strip_prefix("Dimension").unwrap().trim();
-                dimension = line.parse().unwrap();
+                dimension = if let Ok(dim) = line.parse() {
+                    dim
+                } else {
+                    let mut line = String::new();
+                    reader.read_line(&mut line)?;
+                    let trimmed_line = line.trim();
+                    trimmed_line.parse().unwrap()
+                };
                 debug!("dimension = {dimension}");
             } else if trimmed_line == "Vertices"
                 || trimmed_line == "Edges"
@@ -213,7 +220,7 @@ impl MeshbReader {
     pub fn read_vertices<const D: usize>(
         &mut self,
     ) -> Result<impl ExactSizeIterator<Item = ([f64; D], i32)> + '_> {
-        assert_eq!(D, self.dimension as usize);
+        assert!(D <= self.dimension as usize);
 
         let n_verts = self.goto_section("Vertices")?;
         debug!("read {n_verts} vertices");
@@ -234,11 +241,14 @@ impl MeshbReader {
                 assert_ne!(len, 0);
                 let trimmed_line = line.trim();
                 assert!(!trimmed_line.is_empty());
-                for (i, v) in trimmed_line.split(' ').enumerate() {
+                for (i, v) in trimmed_line
+                    .split(' ')
+                    .filter(|x| !x.trim().is_empty())
+                    .enumerate()
+                {
                     if i < D {
                         vals[i] = v.parse().unwrap();
-                    }
-                    if i == D {
+                    } else if i == self.dimension as usize {
                         tag = v.parse().unwrap();
                     }
                 }
@@ -278,7 +288,11 @@ impl MeshbReader {
                 assert_ne!(len, 0);
                 let trimmed_line = line.trim();
                 assert!(!trimmed_line.is_empty());
-                for (i, v) in trimmed_line.split(' ').enumerate() {
+                for (i, v) in trimmed_line
+                    .split(' ')
+                    .filter(|x| !x.trim().is_empty())
+                    .enumerate()
+                {
                     if i < N {
                         vals[i] = v.parse::<usize>().unwrap() - 1;
                     }
