@@ -1,5 +1,5 @@
 use crate::{Error, Result};
-use log::debug;
+use log::{debug, warn};
 use std::{
     collections::HashMap,
     fs::File,
@@ -181,7 +181,10 @@ impl MeshbReader {
                 8 => "Tetrahedra",
                 62 => "SolAtVertices",
                 54 => "End",
-                _ => return Err(Error::from(&format!("Unknown keyword {kwd}"))),
+                _ => {
+                    warn!("Skipping keyword {kwd}");
+                    &format!("{kwd}")
+                }
             };
             debug!("found entry {name}");
             if kwd == 54 {
