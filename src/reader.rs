@@ -680,9 +680,9 @@ mod tests {
         let verts = (0..n_verts)
             .map(|_| {
                 [
-                    rng.gen::<f64>() - 0.5,
-                    rng.gen::<f64>() - 0.5,
-                    rng.gen::<f64>() - 0.5,
+                    rng.random::<f64>() - 0.5,
+                    rng.random::<f64>() - 0.5,
+                    rng.random::<f64>() - 0.5,
                 ]
             })
             .collect::<Vec<_>>();
@@ -813,7 +813,7 @@ mod tests {
         let n_faces = 50;
 
         let verts = (0..n_verts)
-            .map(|_| [rng.gen::<f64>() - 0.5, rng.gen::<f64>() - 0.5])
+            .map(|_| [rng.random::<f64>() - 0.5, rng.random::<f64>() - 0.5])
             .collect::<Vec<_>>();
 
         let elems = (0..n_elems)
