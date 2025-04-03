@@ -2,6 +2,7 @@
 name = "minimeshb"
 version = "0.1.0"
 edition = "2024"
+links = "minimeshb"
 
 [dependencies]
 env_logger = "0.11.3"
