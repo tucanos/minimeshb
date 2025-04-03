@@ -19,9 +19,8 @@ pub struct GmfReader {
 
 impl GmfReader {
     /// Create a new file
-    #[must_use]
     pub fn new(fname: &str) -> Result<Self> {
-        debug!("Open {} (read)", fname);
+        debug!("Open {fname} (read)");
         let mut dim: c_int = 0;
         let mut version: c_int = 0;
 
@@ -66,7 +65,7 @@ impl GmfReader {
         assert_eq!(D, self.dim.try_into().unwrap());
 
         let n_nodes = unsafe { GmfStatKwd(self.file, GmfKwdCod::GmfVertices as c_int) };
-        debug!("Read {} vertices", n_nodes);
+        debug!("Read {n_nodes} vertices");
 
         unsafe { GmfGotoKwd(self.file, GmfKwdCod::GmfVertices as c_int) };
 
@@ -148,7 +147,7 @@ impl GmfReader {
     }
 
     /// Read the element connectivity and element tags
-    #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn read_elements<const N: usize>(
         &self,
         etype: GmfElementTypes,
@@ -164,7 +163,7 @@ impl GmfReader {
         assert_eq!(N, m);
 
         let n_elems = unsafe { GmfStatKwd(self.file, etype as c_int) };
-        debug!("Read {} elements ({:?})", n_elems, etype);
+        debug!("Read {n_elems} elements ({etype:?})");
 
         unsafe { GmfGotoKwd(self.file, etype as c_int) };
 
@@ -339,7 +338,6 @@ impl GmfReader {
     }
 
     /// Read the field defined at the vertices (for .sol(b) files)
-    #[must_use]
     pub fn get_solution_size(&mut self) -> Result<usize> {
         let mut field_type: c_int = 0;
         let mut n_types: c_int = 0;
@@ -390,7 +388,7 @@ impl GmfReader {
         };
         assert_eq!(sol_size, n_comp as c_int);
 
-        debug!("Read {}x{} values", n_verts, n_comp);
+        debug!("Read {n_verts}x{n_comp} values");
 
         let mut val = [0.0; N];
 
@@ -409,7 +407,7 @@ impl GmfReader {
                     );
                 }
                 for (i, j) in order.iter().copied().enumerate() {
-                    val[i] = s[j].try_into().unwrap();
+                    val[i] = s[j].into();
                 }
             } else {
                 let mut s = [0_f64; N];
@@ -440,6 +438,6 @@ impl GmfReader {
 
 impl Drop for GmfReader {
     fn drop(&mut self) {
-        self.close()
+        self.close();
     }
 }

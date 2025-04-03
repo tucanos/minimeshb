@@ -77,32 +77,32 @@ impl MeshbWriter {
         }
     }
 
-    fn size_of_float(&self) -> u64 {
+    const fn size_of_float(&self) -> u64 {
         if self.version == 1 {
-            std::mem::size_of::<f32>() as u64
+            size_of::<f32>() as u64
         } else {
-            std::mem::size_of::<f64>() as u64
+            size_of::<f64>() as u64
         }
     }
 
-    fn size_of_pos(&self) -> u64 {
+    const fn size_of_pos(&self) -> u64 {
         if self.version >= 3 {
-            std::mem::size_of::<i64>() as u64
+            size_of::<i64>() as u64
         } else {
-            std::mem::size_of::<i32>() as u64
+            size_of::<i32>() as u64
         }
     }
 
-    fn size_of_index(&self) -> u64 {
+    const fn size_of_index(&self) -> u64 {
         if self.version == 4 {
-            std::mem::size_of::<u64>() as u64
+            size_of::<u64>() as u64
         } else {
-            std::mem::size_of::<i32>() as u64
+            size_of::<i32>() as u64
         }
     }
 
-    fn size_of_kwd(&self) -> u64 {
-        std::mem::size_of::<i32>() as u64
+    const fn size_of_kwd(&self) -> u64 {
+        size_of::<i32>() as u64
     }
 
     fn new_binary(fname: &str, version: u8, dimension: u8) -> Result<Self> {
@@ -118,14 +118,14 @@ impl MeshbWriter {
         };
 
         res.write_kwd(1);
-        res.write_kwd(version as i32);
+        res.write_kwd(i32::from(version));
 
         res.write_kwd(3); // Dimension
         let mut next = res.writer.stream_position().unwrap();
         next += res.size_of_pos(); // Next
         next += res.size_of_kwd(); // Dimension
         res.write_pos(next as i64);
-        res.write_kwd(dimension as i32);
+        res.write_kwd(i32::from(dimension));
         Ok(res)
     }
 
@@ -174,9 +174,9 @@ impl MeshbWriter {
         for (v, t) in verts.zip(tags) {
             line.clear();
             for x in v {
-                line += &format!("{} ", x);
+                line += &format!("{x} ");
             }
-            line += &format!("{}", t);
+            line += &format!("{t}");
             writeln!(self.writer, "{}", &line)?;
         }
 
@@ -196,7 +196,7 @@ impl MeshbWriter {
         next += self.size_of_kwd(); // Keyword
         next += self.size_of_pos();
         next += self.size_of_index();
-        next += self.dimension as u64 * verts.len() as u64 * self.size_of_float(); // Coordinates
+        next += u64::from(self.dimension) * verts.len() as u64 * self.size_of_float(); // Coordinates
         next += verts.len() as u64 * self.size_of_index(); // Tags
 
         self.write_kwd(4);
@@ -207,7 +207,7 @@ impl MeshbWriter {
             for x in v {
                 self.write_float(x);
             }
-            self.write_index(t as i64);
+            self.write_index(i64::from(t));
         }
 
         Ok(())
@@ -251,7 +251,7 @@ impl MeshbWriter {
         };
         assert_eq!(N, m);
 
-        writeln!(self.writer, "{}", kwd)?;
+        writeln!(self.writer, "{kwd}")?;
         writeln!(self.writer, "{}", elems.len())?;
 
         let mut line = String::new();
@@ -261,7 +261,7 @@ impl MeshbWriter {
             for x in v {
                 line += &format!("{} ", x + 1);
             }
-            line += &format!("{}", t);
+            line += &format!("{t}");
             writeln!(self.writer, "{}", &line)?;
         }
 
@@ -301,7 +301,7 @@ impl MeshbWriter {
             for x in v {
                 self.write_index(x as i64 + 1);
             }
-            self.write_index(t as i64);
+            self.write_index(i64::from(t));
         }
 
         Ok(())
@@ -361,7 +361,7 @@ impl MeshbWriter {
         } else if N == (self.dimension * (self.dimension + 1) / 2) as usize {
             Ok(3)
         } else {
-            Err(Error::from(&format!("Unvalid field size {}", N)))
+            Err(Error::from(&format!("Unvalid field size {N}")))
         }
     }
 
@@ -378,7 +378,7 @@ impl MeshbWriter {
         for s in sols {
             line.clear();
             for x in s {
-                line += &format!("{} ", x);
+                line += &format!("{x} ");
             }
             writeln!(self.writer, "{}", &line)?;
         }
@@ -401,7 +401,7 @@ impl MeshbWriter {
         self.write_pos(next as i64);
         self.write_index(sols.len() as i64);
         self.write_kwd(1);
-        self.write_kwd(self.get_solution_type::<N>()? as i32);
+        self.write_kwd(i32::from(self.get_solution_type::<N>()?));
 
         for s in sols {
             for x in s {
@@ -451,17 +451,17 @@ mod tests {
 
         let (verts, vtags) = to_vecs(reader.read_vertices::<3>().unwrap());
         writer
-            .write_vertices(verts.iter().cloned(), vtags.iter().cloned())
+            .write_vertices(verts.iter().copied(), vtags.iter().copied())
             .unwrap();
 
         let (tris, tritags) = to_vecs(reader.read_triangles().unwrap());
         writer
-            .write_triangles(tris.iter().cloned(), tritags.iter().cloned())
+            .write_triangles(tris.iter().copied(), tritags.iter().copied())
             .unwrap();
 
         let (tets, tettags) = to_vecs(reader.read_tetrahedra().unwrap());
         writer
-            .write_tetrahedra(tets.iter().cloned(), tettags.iter().cloned())
+            .write_tetrahedra(tets.iter().copied(), tettags.iter().copied())
             .unwrap();
 
         writer.close();
@@ -513,17 +513,17 @@ mod tests {
 
         let (verts, vtags) = to_vecs(reader.read_vertices::<3>().unwrap());
         writer
-            .write_vertices(verts.iter().cloned(), vtags.iter().cloned())
+            .write_vertices(verts.iter().copied(), vtags.iter().copied())
             .unwrap();
 
         let (tris, tritags) = to_vecs(reader.read_triangles().unwrap());
         writer
-            .write_triangles(tris.iter().cloned(), tritags.iter().cloned())
+            .write_triangles(tris.iter().copied(), tritags.iter().copied())
             .unwrap();
 
         let (tets, tettags) = to_vecs(reader.read_tetrahedra().unwrap());
         writer
-            .write_tetrahedra(tets.iter().cloned(), tettags.iter().cloned())
+            .write_tetrahedra(tets.iter().copied(), tettags.iter().copied())
             .unwrap();
 
         writer.close();
@@ -575,17 +575,17 @@ mod tests {
 
         let (verts, vtags) = to_vecs(reader.read_vertices::<3>().unwrap());
         writer
-            .write_vertices(verts.iter().cloned(), vtags.iter().cloned())
+            .write_vertices(verts.iter().copied(), vtags.iter().copied())
             .unwrap();
 
         let (tris, tritags) = to_vecs(reader.read_triangles().unwrap());
         writer
-            .write_triangles(tris.iter().cloned(), tritags.iter().cloned())
+            .write_triangles(tris.iter().copied(), tritags.iter().copied())
             .unwrap();
 
         let (tets, tettags) = to_vecs(reader.read_tetrahedra().unwrap());
         writer
-            .write_tetrahedra(tets.iter().cloned(), tettags.iter().cloned())
+            .write_tetrahedra(tets.iter().copied(), tettags.iter().copied())
             .unwrap();
 
         writer.close();
@@ -638,7 +638,7 @@ mod tests {
         let mut writer = MeshbWriter::new(&fname, 1, 3).unwrap();
 
         let sols = to_vec(reader.read_solution::<1>().unwrap());
-        writer.write_solution(sols.iter().cloned()).unwrap();
+        writer.write_solution(sols.iter().copied()).unwrap();
 
         writer.close();
 
@@ -660,7 +660,7 @@ mod tests {
         let mut writer = MeshbWriter::new(&fname, 1, 3).unwrap();
 
         let sols = to_vec(reader.read_solution::<3>().unwrap());
-        writer.write_solution(sols.iter().cloned()).unwrap();
+        writer.write_solution(sols.iter().copied()).unwrap();
 
         writer.close();
 
@@ -684,7 +684,7 @@ mod tests {
         let mut writer = MeshbWriter::new(&fname, 1, 3).unwrap();
 
         let sols = to_vec(reader.read_solution::<1>().unwrap());
-        writer.write_solution(sols.iter().cloned()).unwrap();
+        writer.write_solution(sols.iter().copied()).unwrap();
 
         writer.close();
 
@@ -706,7 +706,7 @@ mod tests {
         let mut writer = MeshbWriter::new(&fname, 1, 3).unwrap();
 
         let sols = to_vec(reader.read_solution::<3>().unwrap());
-        writer.write_solution(sols.iter().cloned()).unwrap();
+        writer.write_solution(sols.iter().copied()).unwrap();
 
         writer.close();
 
@@ -731,17 +731,17 @@ mod tests {
 
         let (verts, vtags) = to_vecs(reader.read_vertices::<2>().unwrap());
         writer
-            .write_vertices(verts.iter().cloned(), vtags.iter().cloned())
+            .write_vertices(verts.iter().copied(), vtags.iter().copied())
             .unwrap();
 
         let (edgs, edgtags) = to_vecs(reader.read_edges().unwrap());
         writer
-            .write_edges(edgs.iter().cloned(), edgtags.iter().cloned())
+            .write_edges(edgs.iter().copied(), edgtags.iter().copied())
             .unwrap();
 
         let (tris, tritags) = to_vecs(reader.read_triangles().unwrap());
         writer
-            .write_triangles(tris.iter().cloned(), tritags.iter().cloned())
+            .write_triangles(tris.iter().copied(), tritags.iter().copied())
             .unwrap();
 
         writer.close();
@@ -793,17 +793,17 @@ mod tests {
 
         let (verts, vtags) = to_vecs(reader.read_vertices::<2>().unwrap());
         writer
-            .write_vertices(verts.iter().cloned(), vtags.iter().cloned())
+            .write_vertices(verts.iter().copied(), vtags.iter().copied())
             .unwrap();
 
         let (edgs, edgtags) = to_vecs(reader.read_edges().unwrap());
         writer
-            .write_edges(edgs.iter().cloned(), edgtags.iter().cloned())
+            .write_edges(edgs.iter().copied(), edgtags.iter().copied())
             .unwrap();
 
         let (tris, tritags) = to_vecs(reader.read_triangles().unwrap());
         writer
-            .write_triangles(tris.iter().cloned(), tritags.iter().cloned())
+            .write_triangles(tris.iter().copied(), tritags.iter().copied())
             .unwrap();
 
         writer.close();
@@ -855,17 +855,17 @@ mod tests {
 
         let (verts, vtags) = to_vecs(reader.read_vertices::<2>().unwrap());
         writer
-            .write_vertices(verts.iter().cloned(), vtags.iter().cloned())
+            .write_vertices(verts.iter().copied(), vtags.iter().copied())
             .unwrap();
 
         let (edgs, edgtags) = to_vecs(reader.read_edges().unwrap());
         writer
-            .write_edges(edgs.iter().cloned(), edgtags.iter().cloned())
+            .write_edges(edgs.iter().copied(), edgtags.iter().copied())
             .unwrap();
 
         let (tris, tritags) = to_vecs(reader.read_triangles().unwrap());
         writer
-            .write_triangles(tris.iter().cloned(), tritags.iter().cloned())
+            .write_triangles(tris.iter().copied(), tritags.iter().copied())
             .unwrap();
 
         writer.close();
@@ -916,7 +916,7 @@ mod tests {
         let mut writer = MeshbWriter::new(&fname, 1, 2).unwrap();
 
         let sols = to_vec(reader.read_solution::<1>().unwrap());
-        writer.write_solution(sols.iter().cloned()).unwrap();
+        writer.write_solution(sols.iter().copied()).unwrap();
 
         writer.close();
 
@@ -938,7 +938,7 @@ mod tests {
         let mut writer = MeshbWriter::new(&fname, 1, 2).unwrap();
 
         let sols = to_vec(reader.read_solution::<2>().unwrap());
-        writer.write_solution(sols.iter().cloned()).unwrap();
+        writer.write_solution(sols.iter().copied()).unwrap();
 
         writer.close();
 
@@ -962,7 +962,7 @@ mod tests {
         let mut writer = MeshbWriter::new(&fname, 1, 2).unwrap();
 
         let sols = to_vec(reader.read_solution::<1>().unwrap());
-        writer.write_solution(sols.iter().cloned()).unwrap();
+        writer.write_solution(sols.iter().copied()).unwrap();
 
         writer.close();
 
@@ -984,7 +984,7 @@ mod tests {
         let mut writer = MeshbWriter::new(&fname, 1, 2).unwrap();
 
         let sols = to_vec(reader.read_solution::<2>().unwrap());
-        writer.write_solution(sols.iter().cloned()).unwrap();
+        writer.write_solution(sols.iter().copied()).unwrap();
 
         writer.close();
 
@@ -1020,28 +1020,28 @@ mod tests {
         let elems = (0..n_elems)
             .map(|_| {
                 [
-                    rng.gen_range(0..n_verts) as usize,
-                    rng.gen_range(0..n_verts) as usize,
-                    rng.gen_range(0..n_verts) as usize,
-                    rng.gen_range(0..n_verts) as usize,
+                    rng.random_range(0..n_verts) as usize,
+                    rng.random_range(0..n_verts) as usize,
+                    rng.random_range(0..n_verts) as usize,
+                    rng.random_range(0..n_verts) as usize,
                 ]
             })
             .collect::<Vec<_>>();
         let etags = (0..n_elems)
-            .map(|_| rng.gen_range(0..10) as i32)
+            .map(|_| rng.random_range(0..10))
             .collect::<Vec<_>>();
 
         let faces = (0..n_faces)
             .map(|_| {
                 [
-                    rng.gen_range(0..n_verts) as usize,
-                    rng.gen_range(0..n_verts) as usize,
-                    rng.gen_range(0..n_verts) as usize,
+                    rng.random_range(0..n_verts) as usize,
+                    rng.random_range(0..n_verts) as usize,
+                    rng.random_range(0..n_verts) as usize,
                 ]
             })
             .collect::<Vec<_>>();
         let ftags: Vec<i32> = (0..n_faces)
-            .map(|_| rng.gen_range(0..10) as i32)
+            .map(|_| rng.random_range(0..10))
             .collect::<Vec<_>>();
 
         let file = NamedTempFile::new().unwrap();
@@ -1053,13 +1053,13 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, version, 3).unwrap();
         writer
-            .write_vertices(verts.iter().cloned(), verts.iter().map(|_| 1))
+            .write_vertices(verts.iter().copied(), verts.iter().map(|_| 1))
             .unwrap();
         writer
-            .write_tetrahedra(elems.iter().cloned(), etags.iter().cloned())
+            .write_tetrahedra(elems.iter().copied(), etags.iter().copied())
             .unwrap();
         writer
-            .write_triangles(faces.iter().cloned(), ftags.iter().cloned())
+            .write_triangles(faces.iter().copied(), ftags.iter().copied())
             .unwrap();
         writer.close();
 
@@ -1089,49 +1089,49 @@ mod tests {
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_3d_ascii_1() {
-        test_libmeshb_3d(1, false)
+        test_libmeshb_3d(1, false);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_3d_ascii_2() {
-        test_libmeshb_3d(2, false)
+        test_libmeshb_3d(2, false);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_3d_ascii_3() {
-        test_libmeshb_3d(3, false)
+        test_libmeshb_3d(3, false);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_3d_ascii_4() {
-        test_libmeshb_3d(4, false)
+        test_libmeshb_3d(4, false);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_3d_binary_1() {
-        test_libmeshb_3d(1, true)
+        test_libmeshb_3d(1, true);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_3d_binary_2() {
-        test_libmeshb_3d(2, true)
+        test_libmeshb_3d(2, true);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_3d_binary_3() {
-        test_libmeshb_3d(3, true)
+        test_libmeshb_3d(3, true);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_3d_binary_4() {
-        test_libmeshb_3d(4, true)
+        test_libmeshb_3d(4, true);
     }
 
     #[cfg(feature = "libmeshb-sys")]
@@ -1149,26 +1149,26 @@ mod tests {
         let elems = (0..n_elems)
             .map(|_| {
                 [
-                    rng.gen_range(0..n_verts) as usize,
-                    rng.gen_range(0..n_verts) as usize,
-                    rng.gen_range(0..n_verts) as usize,
+                    rng.random_range(0..n_verts) as usize,
+                    rng.random_range(0..n_verts) as usize,
+                    rng.random_range(0..n_verts) as usize,
                 ]
             })
             .collect::<Vec<_>>();
         let etags = (0..n_elems)
-            .map(|_| rng.gen_range(0..10) as i32)
+            .map(|_| rng.random_range(0..10))
             .collect::<Vec<_>>();
 
         let faces = (0..n_faces)
             .map(|_| {
                 [
-                    rng.gen_range(0..n_verts) as usize,
-                    rng.gen_range(0..n_verts) as usize,
+                    rng.random_range(0..n_verts) as usize,
+                    rng.random_range(0..n_verts) as usize,
                 ]
             })
             .collect::<Vec<_>>();
         let ftags: Vec<i32> = (0..n_faces)
-            .map(|_| rng.gen_range(0..10) as i32)
+            .map(|_| rng.random_range(0..10))
             .collect::<Vec<_>>();
 
         let file = NamedTempFile::new().unwrap();
@@ -1180,13 +1180,13 @@ mod tests {
 
         let mut writer = MeshbWriter::new(&fname, version, 2).unwrap();
         writer
-            .write_vertices(verts.iter().cloned(), verts.iter().map(|_| 1))
+            .write_vertices(verts.iter().copied(), verts.iter().map(|_| 1))
             .unwrap();
         writer
-            .write_triangles(elems.iter().cloned(), etags.iter().cloned())
+            .write_triangles(elems.iter().copied(), etags.iter().copied())
             .unwrap();
         writer
-            .write_edges(faces.iter().cloned(), ftags.iter().cloned())
+            .write_edges(faces.iter().copied(), ftags.iter().copied())
             .unwrap();
         writer.close();
 
@@ -1216,48 +1216,48 @@ mod tests {
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_2d_ascii_1() {
-        test_libmeshb_2d(1, false)
+        test_libmeshb_2d(1, false);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_2d_ascii_2() {
-        test_libmeshb_2d(2, false)
+        test_libmeshb_2d(2, false);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_2d_ascii_3() {
-        test_libmeshb_2d(3, false)
+        test_libmeshb_2d(3, false);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_2d_ascii_4() {
-        test_libmeshb_2d(4, false)
+        test_libmeshb_2d(4, false);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_2d_binary_1() {
-        test_libmeshb_2d(1, true)
+        test_libmeshb_2d(1, true);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_2d_binary_2() {
-        test_libmeshb_2d(2, true)
+        test_libmeshb_2d(2, true);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_2d_binary_3() {
-        test_libmeshb_2d(3, true)
+        test_libmeshb_2d(3, true);
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
     fn test_libmeshb_2d_binary_4() {
-        test_libmeshb_2d(4, true)
+        test_libmeshb_2d(4, true);
     }
 }

@@ -16,17 +16,16 @@ pub struct GmfWriter {
 
 impl GmfWriter {
     /// Create a new file
-    #[must_use]
     pub fn new(fname: &str, version: u8, dim: u8) -> Result<Self> {
-        debug!("Open {} (write)", fname);
+        debug!("Open {fname} (write)");
 
         let cfname = CString::new(fname).unwrap();
         let file = unsafe {
             GmfOpenMesh(
                 cfname.as_ptr(),
                 GmfWrite as c_int,
-                version as c_int,
-                dim as c_int,
+                c_int::from(version),
+                c_int::from(dim),
             )
         };
         if file == 0 {
@@ -138,7 +137,7 @@ impl GmfWriter {
                         e[1] + 1,
                         e[2] + 1,
                         e[3] + 1,
-                        t as i64,
+                        i64::from(t),
                     );
                 },
             };
@@ -186,7 +185,7 @@ impl GmfWriter {
         sols: I,
     ) -> Result<()> {
         let n_verts = sols.len();
-        debug!("Write {}x{} values", n_verts, N);
+        debug!("Write {n_verts}x{N} values");
 
         let field_type = match N {
             1 => GmfFieldTypes::Scalar,
