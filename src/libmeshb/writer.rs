@@ -1,11 +1,11 @@
 use super::{GmfElementTypes, GmfFieldTypes};
 use crate::Result;
-use crate::{libmeshb::field_order, Error};
+use crate::{Error, libmeshb::field_order};
 use libmeshb_sys::{
     GmfCloseMesh, GmfKwdCod, GmfOpenMesh, GmfSca, GmfSetKwd, GmfSetLin, GmfSymMat, GmfVec, GmfWrite,
 };
 use log::debug;
-use std::ffi::{c_int, CString};
+use std::ffi::{CString, c_int};
 
 /// Writer for .mesh(b) / .sol(b) files (interface to libMeshb)
 /// file version 2 (int32 and float64) is used

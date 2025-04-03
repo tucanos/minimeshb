@@ -5,7 +5,7 @@ use libmeshb_sys::{
     GmfSymMat, GmfVec,
 };
 use log::debug;
-use std::ffi::{c_int, CString};
+use std::ffi::{CString, c_int};
 use std::ptr::addr_of_mut;
 
 use super::{GmfElementTypes, GmfFieldTypes};

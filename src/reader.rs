@@ -407,7 +407,7 @@ mod tests {
     #[cfg(feature = "libmeshb-sys")]
     use crate::libmeshb::GmfWriter;
     #[cfg(feature = "libmeshb-sys")]
-    use rand::{rngs::StdRng, Rng, SeedableRng};
+    use rand::{Rng, SeedableRng, rngs::StdRng};
     #[cfg(feature = "libmeshb-sys")]
     use tempfile::NamedTempFile;
 

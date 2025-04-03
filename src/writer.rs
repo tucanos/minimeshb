@@ -422,7 +422,7 @@ mod tests {
     #[cfg(feature = "libmeshb-sys")]
     use crate::libmeshb::GmfReader;
     #[cfg(feature = "libmeshb-sys")]
-    use rand::{rngs::StdRng, Rng, SeedableRng};
+    use rand::{Rng, SeedableRng, rngs::StdRng};
 
     fn to_vecs<const N: usize, T, I: ExactSizeIterator<Item = ([T; N], i32)>>(
         it: I,
