@@ -40,7 +40,7 @@ jobs:
         path: ${{ env.LIBMESHB_DIR }}
         key: libmeshb-${{ env.LIBMESHB_COMMIT }}
     - name: Run clippy
-      uses: clechasseur/rs-clippy-check@v4
+      uses: clechasseur/rs-clippy-check@v5
     - run: cargo fmt --check --all
     - name: Run tests
       uses: clechasseur/rs-cargo@v4
