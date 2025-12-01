@@ -245,7 +245,9 @@ impl MeshbWriter {
     ) -> Result<()> {
         let m = match kwd {
             "Edges" => 2,
+            "EdgesP2" => 3,
             "Triangles" => 3,
+            "TrianglesP2" => 6,
             "Tetrahedra" => 4,
             _ => unreachable!(),
         };
@@ -280,7 +282,9 @@ impl MeshbWriter {
     ) -> Result<()> {
         let (m, kwd) = match kwd {
             "Edges" => (2, 5),
+            "EdgesP2" => (3, 25),
             "Triangles" => (3, 6),
+            "TrianglesP2" => (6, 24),
             "Tetrahedra" => (4, 8),
             _ => unreachable!(),
         };
@@ -318,6 +322,17 @@ impl MeshbWriter {
         self.write_elements("Edges", elems, tags)
     }
 
+    pub fn write_quadratic_edges<
+        I1: ExactSizeIterator<Item = [usize; 3]>,
+        I2: ExactSizeIterator<Item = i32>,
+    >(
+        &mut self,
+        elems: I1,
+        tags: I2,
+    ) -> Result<()> {
+        self.write_elements("EdgesP2", elems, tags)
+    }
+
     pub fn write_triangles<
         I1: ExactSizeIterator<Item = [usize; 3]>,
         I2: ExactSizeIterator<Item = i32>,
@@ -327,6 +342,17 @@ impl MeshbWriter {
         tags: I2,
     ) -> Result<()> {
         self.write_elements("Triangles", elems, tags)
+    }
+
+    pub fn write_quadratic_triangles<
+        I1: ExactSizeIterator<Item = [usize; 6]>,
+        I2: ExactSizeIterator<Item = i32>,
+    >(
+        &mut self,
+        elems: I1,
+        tags: I2,
+    ) -> Result<()> {
+        self.write_elements("TrianglesP2", elems, tags)
     }
 
     pub fn write_tetrahedra<

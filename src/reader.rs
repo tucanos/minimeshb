@@ -79,7 +79,9 @@ impl MeshbReader {
                 debug!("dimension = {dimension}");
             } else if trimmed_line == "Vertices"
                 || trimmed_line == "Edges"
+                || trimmed_line == "EdgesP2"
                 || trimmed_line == "Triangles"
+                || trimmed_line == "TrianglesP2"
                 || trimmed_line == "Tetrahedra"
                 || trimmed_line == "SolAtVertices"
             {
@@ -180,7 +182,9 @@ impl MeshbReader {
             let name = match kwd {
                 4 => "Vertices",
                 5 => "Edges",
+                25 => "EdgesP2",
                 6 => "Triangles",
+                24 => "TrianglesP2",
                 8 => "Tetrahedra",
                 62 => "SolAtVertices",
                 54 => "End",
@@ -269,7 +273,9 @@ impl MeshbReader {
     ) -> Result<impl ExactSizeIterator<Item = ([usize; N], i32)> + '_> {
         let m = match kwd {
             "Edges" => 2,
+            "EdgesP2" => 3,
             "Triangles" => 3,
+            "TrianglesP2" => 6,
             "Tetrahedra" => 4,
             _ => unreachable!(),
         };
@@ -315,10 +321,22 @@ impl MeshbReader {
         self.read_elements("Edges")
     }
 
+    pub fn read_quadratic_edges(
+        &mut self,
+    ) -> Result<impl ExactSizeIterator<Item = ([usize; 3], i32)> + '_> {
+        self.read_elements("EdgesP2")
+    }
+
     pub fn read_triangles(
         &mut self,
     ) -> Result<impl ExactSizeIterator<Item = ([usize; 3], i32)> + '_> {
         self.read_elements("Triangles")
+    }
+
+    pub fn read_quadratic_triangles(
+        &mut self,
+    ) -> Result<impl ExactSizeIterator<Item = ([usize; 6], i32)> + '_> {
+        self.read_elements("TrianglesP2")
     }
 
     pub fn read_tetrahedra(
