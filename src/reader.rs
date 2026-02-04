@@ -345,6 +345,12 @@ impl MeshbReader {
         self.read_elements("Tetrahedra")
     }
 
+    pub fn read_quadratic_tetrahedra(
+        &mut self,
+    ) -> Result<impl ExactSizeIterator<Item = ([usize; 10], i32)> + '_> {
+        self.read_elements("TetrahedraP2")
+    }
+
     pub fn get_solution_size(&mut self) -> Result<usize> {
         let _ = self.goto_section("SolAtVertices")?;
         let m: i16;

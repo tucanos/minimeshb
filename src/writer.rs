@@ -249,6 +249,7 @@ impl MeshbWriter {
             "Triangles" => 3,
             "TrianglesP2" => 6,
             "Tetrahedra" => 4,
+            "TetrahedraP2" => 10,
             _ => unreachable!(),
         };
         assert_eq!(N, m);
@@ -286,6 +287,7 @@ impl MeshbWriter {
             "Triangles" => (3, 6),
             "TrianglesP2" => (6, 24),
             "Tetrahedra" => (4, 8),
+            "TetrahedraP2" => (10, 30),
             _ => unreachable!(),
         };
         assert_eq!(N, m);
@@ -353,6 +355,17 @@ impl MeshbWriter {
         tags: I2,
     ) -> Result<()> {
         self.write_elements("TrianglesP2", elems, tags)
+    }
+
+    pub fn write_quadratic_tetrahedra<
+        I1: ExactSizeIterator<Item = [usize; 10]>,
+        I2: ExactSizeIterator<Item = i32>,
+    >(
+        &mut self,
+        elems: I1,
+        tags: I2,
+    ) -> Result<()> {
+        self.write_elements("TetrahedraP2", elems, tags)
     }
 
     pub fn write_tetrahedra<
