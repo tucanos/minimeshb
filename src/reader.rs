@@ -84,6 +84,9 @@ impl MeshbReader {
                 || trimmed_line == "TrianglesP2"
                 || trimmed_line == "Tetrahedra"
                 || trimmed_line == "SolAtVertices"
+                || trimmed_line == "SolAtEdges"
+                || trimmed_line == "SolAtTriangles"
+                || trimmed_line == "SolAtTetrahedra"
             {
                 debug!("found entry {trimmed_line}");
                 offsets.insert(
@@ -186,7 +189,11 @@ impl MeshbReader {
                 6 => "Triangles",
                 24 => "TrianglesP2",
                 8 => "Tetrahedra",
+                30 => "TetrahedraP2",
                 62 => "SolAtVertices",
+                63 => "SolAtEdges",
+                64 => "SolAtTriangles",
+                66 => "SolAtTetrahedra",
                 54 => "End",
                 _ => {
                     warn!("Skipping keyword {kwd}");
@@ -277,6 +284,7 @@ impl MeshbReader {
             "Triangles" => 3,
             "TrianglesP2" => 6,
             "Tetrahedra" => 4,
+            "TetrahedraP2" => 10,
             _ => unreachable!(),
         };
         assert_eq!(N, m);
@@ -351,8 +359,8 @@ impl MeshbReader {
         self.read_elements("TetrahedraP2")
     }
 
-    pub fn get_solution_size(&mut self) -> Result<usize> {
-        let _ = self.goto_section("SolAtVertices")?;
+    pub fn get_solution_size(&mut self, label: &str) -> Result<usize> {
+        let _ = self.goto_section(label)?;
         let m: i16;
         if self.is_binary {
             let n_fields = self.read_kwd();
@@ -382,11 +390,12 @@ impl MeshbReader {
         }
     }
 
-    pub fn read_solution<const N: usize>(
+    fn read_sol<const N: usize>(
         &mut self,
+        label: &str,
     ) -> Result<impl ExactSizeIterator<Item = [f64; N]> + '_> {
-        let n_verts = self.goto_section("SolAtVertices")?;
-        let m = self.get_solution_size()?;
+        let n_verts = self.goto_section(label)?;
+        let m = self.get_solution_size(label)?;
         assert_eq!(N, m);
 
         debug!("read field");
@@ -421,6 +430,30 @@ impl MeshbReader {
             }
             vals
         }))
+    }
+
+    pub fn read_solution<const N: usize>(
+        &mut self,
+    ) -> Result<impl ExactSizeIterator<Item = [f64; N]> + '_> {
+        self.read_sol("SolAtVertices")
+    }
+
+    pub fn read_edge_solution<const N: usize>(
+        &mut self,
+    ) -> Result<impl ExactSizeIterator<Item = [f64; N]> + '_> {
+        self.read_sol("SolAtEdges")
+    }
+
+    pub fn read_triangle_solution<const N: usize>(
+        &mut self,
+    ) -> Result<impl ExactSizeIterator<Item = [f64; N]> + '_> {
+        self.read_sol("SolAtTriangles")
+    }
+
+    pub fn read_tetrahedron_solution<const N: usize>(
+        &mut self,
+    ) -> Result<impl ExactSizeIterator<Item = [f64; N]> + '_> {
+        self.read_sol("SolAtTetrahedra")
     }
 }
 

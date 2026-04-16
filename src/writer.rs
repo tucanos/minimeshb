@@ -386,9 +386,48 @@ impl MeshbWriter {
         debug!("write field");
 
         if self.is_binary {
-            self.write_solution_binary(sols)
+            self.write_solution_binary(62, sols)
         } else {
-            self.write_solution_ascii(sols)
+            self.write_solution_ascii("SolAtVertices", sols)
+        }
+    }
+
+    pub fn write_edge_solution<const N: usize, I: ExactSizeIterator<Item = [f64; N]>>(
+        &mut self,
+        sols: I,
+    ) -> Result<()> {
+        debug!("write field on edges");
+
+        if self.is_binary {
+            self.write_solution_binary(63, sols)
+        } else {
+            self.write_solution_ascii("SolAtEdges", sols)
+        }
+    }
+
+    pub fn write_triangle_solution<const N: usize, I: ExactSizeIterator<Item = [f64; N]>>(
+        &mut self,
+        sols: I,
+    ) -> Result<()> {
+        debug!("write field on triangles");
+
+        if self.is_binary {
+            self.write_solution_binary(64, sols)
+        } else {
+            self.write_solution_ascii("SolAtTriangles", sols)
+        }
+    }
+
+    pub fn write_tetrahedron_solution<const N: usize, I: ExactSizeIterator<Item = [f64; N]>>(
+        &mut self,
+        sols: I,
+    ) -> Result<()> {
+        debug!("write field on tetrahedra");
+
+        if self.is_binary {
+            self.write_solution_binary(66, sols)
+        } else {
+            self.write_solution_ascii("SolAtTetrahedra", sols)
         }
     }
 
@@ -406,9 +445,10 @@ impl MeshbWriter {
 
     fn write_solution_ascii<const N: usize, I: ExactSizeIterator<Item = [f64; N]>>(
         &mut self,
+        label: &str,
         sols: I,
     ) -> Result<()> {
-        writeln!(self.writer, "SolAtVertices")?;
+        writeln!(self.writer, "{}", label)?;
         writeln!(self.writer, "{}", sols.len())?;
         writeln!(self.writer, "1 {}", self.get_solution_type::<N>()?)?;
 
@@ -427,6 +467,7 @@ impl MeshbWriter {
 
     fn write_solution_binary<const N: usize, I: ExactSizeIterator<Item = [f64; N]>>(
         &mut self,
+        label: i32,
         sols: I,
     ) -> Result<()> {
         let mut next = self.writer.stream_position().unwrap();
@@ -436,7 +477,7 @@ impl MeshbWriter {
         next += 2 * self.size_of_kwd(); // field type
         next += N as u64 * sols.len() as u64 * self.size_of_float(); // Values
 
-        self.write_kwd(62);
+        self.write_kwd(label);
         self.write_pos(next as i64);
         self.write_index(sols.len() as i64);
         self.write_kwd(1);
