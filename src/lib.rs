@@ -4,7 +4,7 @@ pub mod reader;
 pub mod writer;
 use core::fmt;
 
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 #[derive(Debug)]
 pub struct Error(String);
 
