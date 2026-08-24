@@ -280,8 +280,7 @@ impl MeshbReader {
     ) -> Result<impl ExactSizeIterator<Item = ([usize; N], i32)> + '_> {
         let m = match kwd {
             "Edges" => 2,
-            "EdgesP2" => 3,
-            "Triangles" => 3,
+            "EdgesP2" | "Triangles" => 3,
             "TrianglesP2" => 6,
             "Tetrahedra" => 4,
             "TetrahedraP2" => 10,
