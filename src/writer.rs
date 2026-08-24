@@ -124,7 +124,7 @@ impl MeshbWriter {
         let mut next = res.writer.stream_position().unwrap();
         next += res.size_of_pos(); // Next
         next += res.size_of_kwd(); // Dimension
-        res.write_pos(next as i64);
+        res.write_pos(i64::try_from(next).unwrap());
         res.write_kwd(i32::from(dimension));
         Ok(res)
     }
@@ -177,7 +177,7 @@ impl MeshbWriter {
                 line += &format!("{x} ");
             }
             line += &format!("{t}");
-            writeln!(self.writer, "{}", &line)?;
+            writeln!(self.writer, "{line}")?;
         }
 
         Ok(())
@@ -245,8 +245,7 @@ impl MeshbWriter {
     ) -> Result<()> {
         let m = match kwd {
             "Edges" => 2,
-            "EdgesP2" => 3,
-            "Triangles" => 3,
+            "EdgesP2" | "Triangles" => 3,
             "TrianglesP2" => 6,
             "Tetrahedra" => 4,
             "TetrahedraP2" => 10,
@@ -257,15 +256,11 @@ impl MeshbWriter {
         writeln!(self.writer, "{kwd}")?;
         writeln!(self.writer, "{}", elems.len())?;
 
-        let mut line = String::new();
-
         for (v, t) in elems.zip(tags) {
-            line.clear();
             for x in v {
-                line += &format!("{} ", x + 1);
+                write!(self.writer, "{} ", x + 1)?;
             }
-            line += &format!("{t}");
-            writeln!(self.writer, "{}", &line)?;
+            writeln!(self.writer, "{t}")?;
         }
 
         Ok(())
@@ -300,7 +295,7 @@ impl MeshbWriter {
         next += elems.len() as u64 * self.size_of_index(); // Tags
 
         self.write_kwd(kwd);
-        self.write_pos(next as i64);
+        self.write_pos(i64::try_from(next).unwrap());
         self.write_index(elems.len() as i64);
 
         for (v, t) in elems.zip(tags) {
@@ -448,20 +443,15 @@ impl MeshbWriter {
         label: &str,
         sols: I,
     ) -> Result<()> {
-        writeln!(self.writer, "{}", label)?;
+        writeln!(self.writer, "{label}")?;
         writeln!(self.writer, "{}", sols.len())?;
         writeln!(self.writer, "1 {}", self.get_solution_type::<N>()?)?;
-
-        let mut line = String::new();
-
         for s in sols {
-            line.clear();
             for x in s {
-                line += &format!("{x} ");
+                write!(self.writer, "{x} ")?;
             }
-            writeln!(self.writer, "{}", &line)?;
+            writeln!(self.writer)?;
         }
-
         Ok(())
     }
 
