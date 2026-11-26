@@ -102,7 +102,7 @@ impl GmfReader {
                     };
                     vals[0] = x.into();
                     vals[1] = y.into();
-                    vals[2] = y.into();
+                    vals[2] = z.into();
                 } else {
                     unreachable!()
                 }
