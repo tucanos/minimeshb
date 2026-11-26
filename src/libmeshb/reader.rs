@@ -175,30 +175,26 @@ impl GmfReader {
                 1 => {
                     if self.version < 4 {
                         let mut i0: c_int = 0;
-                        for _ in 0..n_elems {
-                            unsafe {
-                                GmfGetLin(
-                                    self.file,
-                                    etype as c_int,
-                                    addr_of_mut!(i0),
-                                    addr_of_mut!(tag),
-                                )
-                            };
-                            vals[0] = i0.try_into().unwrap();
-                        }
+                        unsafe {
+                            GmfGetLin(
+                                self.file,
+                                etype as c_int,
+                                addr_of_mut!(i0),
+                                addr_of_mut!(tag),
+                            )
+                        };
+                        vals[0] = i0.try_into().unwrap();
                     } else {
                         let mut i0 = 0_i64;
-                        for _ in 0..n_elems {
-                            unsafe {
-                                GmfGetLin(
-                                    self.file,
-                                    etype as c_int,
-                                    addr_of_mut!(i0),
-                                    addr_of_mut!(tag),
-                                )
-                            };
-                            vals[0] = i0.try_into().unwrap();
-                        }
+                        unsafe {
+                            GmfGetLin(
+                                self.file,
+                                etype as c_int,
+                                addr_of_mut!(i0),
+                                addr_of_mut!(tag),
+                            )
+                        };
+                        vals[0] = i0.try_into().unwrap();
                     }
                 }
                 2 => {
