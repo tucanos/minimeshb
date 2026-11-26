@@ -83,6 +83,7 @@ impl MeshbReader {
                 || trimmed_line == "Triangles"
                 || trimmed_line == "TrianglesP2"
                 || trimmed_line == "Tetrahedra"
+                || trimmed_line == "TetrahedraP2"
                 || trimmed_line == "SolAtVertices"
                 || trimmed_line == "SolAtEdges"
                 || trimmed_line == "SolAtTriangles"
