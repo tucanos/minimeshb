@@ -511,6 +511,36 @@ mod tests {
         it.collect()
     }
 
+    #[cfg(feature = "libmeshb-sys")]
+    fn test_libmeshb_solution<const D: usize, const N: usize>(version: u8, binary: bool) {
+        let mut rng = StdRng::seed_from_u64(1234);
+        let n_verts = 100;
+
+        let sols = (0..n_verts)
+            .map(|_| std::array::from_fn(|_| rng.random::<f64>() - 0.5))
+            .collect::<Vec<[f64; N]>>();
+
+        let file = NamedTempFile::new().unwrap();
+        let fname = if binary {
+            file.path().to_str().unwrap().to_owned() + ".solb"
+        } else {
+            file.path().to_str().unwrap().to_owned() + ".sol"
+        };
+
+        let mut writer = MeshbWriter::new(&fname, version, D as u8).unwrap();
+        writer.write_solution(sols.iter().copied()).unwrap();
+        writer.close();
+
+        let mut reader = GmfReader::new(&fname).unwrap();
+        assert_eq!(reader.dimension() as usize, D);
+
+        for (i, sol) in reader.read_solution::<N>().unwrap().enumerate() {
+            for j in 0..N {
+                assert!((sol[j] - sols[i][j]).abs() < 1e-5);
+            }
+        }
+    }
+
     #[test]
     fn test_write_ascii_3d() {
         let mut reader = MeshbReader::new("./data/mesh3d.mesh").unwrap();
@@ -1133,7 +1163,7 @@ mod tests {
             .unwrap();
         writer.close();
 
-        let mut reader = MeshbReader::new(&fname).unwrap();
+        let mut reader = GmfReader::new(&fname).unwrap();
         for (i, (vert, tag)) in reader.read_vertices::<3>().unwrap().enumerate() {
             assert_eq!(tag, 1);
             for j in 0..3 {
@@ -1158,50 +1188,18 @@ mod tests {
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
-    fn test_libmeshb_3d_ascii_1() {
-        test_libmeshb_3d(1, false);
+    fn test_libmeshb_mesh_roundtrip_minimeshb_to_libmeshb_ascii_3d() {
+        for version in 1..=4 {
+            test_libmeshb_3d(version, false);
+        }
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
-    fn test_libmeshb_3d_ascii_2() {
-        test_libmeshb_3d(2, false);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_3d_ascii_3() {
-        test_libmeshb_3d(3, false);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_3d_ascii_4() {
-        test_libmeshb_3d(4, false);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_3d_binary_1() {
-        test_libmeshb_3d(1, true);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_3d_binary_2() {
-        test_libmeshb_3d(2, true);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_3d_binary_3() {
-        test_libmeshb_3d(3, true);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_3d_binary_4() {
-        test_libmeshb_3d(4, true);
+    fn test_libmeshb_mesh_roundtrip_minimeshb_to_libmeshb_binary_3d() {
+        for version in 1..=4 {
+            test_libmeshb_3d(version, true);
+        }
     }
 
     #[cfg(feature = "libmeshb-sys")]
@@ -1285,49 +1283,39 @@ mod tests {
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
-    fn test_libmeshb_2d_ascii_1() {
-        test_libmeshb_2d(1, false);
+    fn test_libmeshb_mesh_roundtrip_minimeshb_to_libmeshb_ascii_2d() {
+        for version in 1..=4 {
+            test_libmeshb_2d(version, false);
+        }
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
-    fn test_libmeshb_2d_ascii_2() {
-        test_libmeshb_2d(2, false);
+    fn test_libmeshb_mesh_roundtrip_minimeshb_to_libmeshb_binary_2d() {
+        for version in 1..=4 {
+            test_libmeshb_2d(version, true);
+        }
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
-    fn test_libmeshb_2d_ascii_3() {
-        test_libmeshb_2d(3, false);
+    fn test_libmeshb_solution_roundtrip_minimeshb_to_libmeshb_ascii() {
+        for version in 1..=4 {
+            test_libmeshb_solution::<2, 1>(version, false);
+            test_libmeshb_solution::<2, 2>(version, false);
+            test_libmeshb_solution::<3, 1>(version, false);
+            test_libmeshb_solution::<3, 3>(version, false);
+        }
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
-    fn test_libmeshb_2d_ascii_4() {
-        test_libmeshb_2d(4, false);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_2d_binary_1() {
-        test_libmeshb_2d(1, true);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_2d_binary_2() {
-        test_libmeshb_2d(2, true);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_2d_binary_3() {
-        test_libmeshb_2d(3, true);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_2d_binary_4() {
-        test_libmeshb_2d(4, true);
+    fn test_libmeshb_solution_roundtrip_minimeshb_to_libmeshb_binary() {
+        for version in 1..=4 {
+            test_libmeshb_solution::<2, 1>(version, true);
+            test_libmeshb_solution::<2, 2>(version, true);
+            test_libmeshb_solution::<3, 1>(version, true);
+            test_libmeshb_solution::<3, 3>(version, true);
+        }
     }
 }

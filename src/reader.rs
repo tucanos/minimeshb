@@ -814,50 +814,18 @@ mod tests {
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
-    fn test_libmeshb_3d_ascii_1() {
-        test_libmeshb_3d(1, false);
+    fn test_libmeshb_mesh_roundtrip_libmeshb_to_minimeshb_ascii_3d() {
+        for version in 1..=4 {
+            test_libmeshb_3d(version, false);
+        }
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
-    fn test_libmeshb_3d_ascii_2() {
-        test_libmeshb_3d(2, false);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_3d_ascii_3() {
-        test_libmeshb_3d(3, false);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_3d_ascii_4() {
-        test_libmeshb_3d(4, false);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_3d_binary_1() {
-        test_libmeshb_3d(1, true);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_3d_binary_2() {
-        test_libmeshb_3d(2, true);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_3d_binary_3() {
-        test_libmeshb_3d(3, true);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_3d_binary_4() {
-        test_libmeshb_3d(4, true);
+    fn test_libmeshb_mesh_roundtrip_libmeshb_to_minimeshb_binary_3d() {
+        for version in 1..=4 {
+            test_libmeshb_3d(version, true);
+        }
     }
 
     #[cfg(feature = "libmeshb-sys")]
@@ -940,50 +908,75 @@ mod tests {
     }
 
     #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_2d_ascii_1() {
-        test_libmeshb_2d(1, false);
+    fn test_libmeshb_solution<const D: usize, const N: usize>(version: u8, binary: bool) {
+        let mut rng = StdRng::seed_from_u64(1234);
+        let n_verts = 100;
+
+        let sols = (0..n_verts)
+            .map(|_| std::array::from_fn(|_| rng.random::<f64>() - 0.5))
+            .collect::<Vec<[f64; N]>>();
+
+        let file = NamedTempFile::new().unwrap();
+        let fname = if binary {
+            file.path().to_str().unwrap().to_owned() + ".solb"
+        } else {
+            file.path().to_str().unwrap().to_owned() + ".sol"
+        };
+
+        let mut writer = GmfWriter::new(&fname, version, D as u8).unwrap();
+        writer.write_solution(sols.iter().copied()).unwrap();
+        writer.close();
+
+        let mut reader = MeshbReader::new(&fname).unwrap();
+        assert_eq!(reader.dimension() as usize, D);
+
+        let sols2 = reader.read_solution::<N>().unwrap().collect::<Vec<_>>();
+        let tol = if version == 1 { 1e-4 } else { 1e-5 };
+        for (sol0, sol1) in sols.iter().zip(sols2.iter()) {
+            for (s0, s1) in sol0.iter().zip(sol1.iter()) {
+                assert!(
+                    (s0 - s1).abs() < tol,
+                    "version={version} binary={binary} D={D} N={N} s0={s0} s1={s1} tol={tol}"
+                );
+            }
+        }
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
-    fn test_libmeshb_2d_ascii_2() {
-        test_libmeshb_2d(2, false);
+    fn test_libmeshb_mesh_roundtrip_libmeshb_to_minimeshb_ascii_2d() {
+        for version in 1..=4 {
+            test_libmeshb_2d(version, false);
+        }
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
-    fn test_libmeshb_2d_ascii_3() {
-        test_libmeshb_2d(3, false);
+    fn test_libmeshb_mesh_roundtrip_libmeshb_to_minimeshb_binary_2d() {
+        for version in 1..=4 {
+            test_libmeshb_2d(version, true);
+        }
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
-    fn test_libmeshb_2d_ascii_4() {
-        test_libmeshb_2d(4, false);
+    fn test_libmeshb_solution_roundtrip_libmeshb_to_minimeshb_ascii() {
+        for version in 1..=4 {
+            test_libmeshb_solution::<2, 1>(version, false);
+            test_libmeshb_solution::<2, 2>(version, false);
+            test_libmeshb_solution::<3, 1>(version, false);
+            test_libmeshb_solution::<3, 3>(version, false);
+        }
     }
 
     #[cfg(feature = "libmeshb-sys")]
     #[test]
-    fn test_libmeshb_2d_binary_1() {
-        test_libmeshb_2d(1, true);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_2d_binary_2() {
-        test_libmeshb_2d(2, true);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_2d_binary_3() {
-        test_libmeshb_2d(3, true);
-    }
-
-    #[cfg(feature = "libmeshb-sys")]
-    #[test]
-    fn test_libmeshb_2d_binary_4() {
-        test_libmeshb_2d(4, true);
+    fn test_libmeshb_solution_roundtrip_libmeshb_to_minimeshb_binary() {
+        for version in 1..=4 {
+            test_libmeshb_solution::<2, 1>(version, true);
+            test_libmeshb_solution::<2, 2>(version, true);
+            test_libmeshb_solution::<3, 1>(version, true);
+            test_libmeshb_solution::<3, 3>(version, true);
+        }
     }
 }

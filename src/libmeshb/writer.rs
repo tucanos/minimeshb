@@ -12,6 +12,7 @@ use std::ffi::{CString, c_int};
 pub struct GmfWriter {
     file: i64,
     dim: u8,
+    version: u8,
 }
 
 impl GmfWriter {
@@ -31,7 +32,7 @@ impl GmfWriter {
         if file == 0 {
             return Err(Error::from(&format!("unable to open {fname}")));
         }
-        Ok(Self { file, dim })
+        Ok(Self { file, dim, version })
     }
 
     #[must_use]
@@ -213,13 +214,23 @@ impl GmfWriter {
         let order = field_order(self.dim as usize, field_type);
 
         let mut vals = [0.0; N];
+        let mut vals_v1 = [0.0_f32; N];
         for s in sols {
             for (i, j) in order.iter().copied().enumerate() {
                 vals[j] = s[i];
             }
 
-            unsafe {
-                GmfSetLin(self.file, GmfKwdCod::GmfSolAtVertices as c_int, &vals);
+            if self.version == 1 {
+                for (dst, src) in vals_v1.iter_mut().zip(vals.iter().copied()) {
+                    *dst = src as f32;
+                }
+                unsafe {
+                    GmfSetLin(self.file, GmfKwdCod::GmfSolAtVertices as c_int, &vals_v1);
+                }
+            } else {
+                unsafe {
+                    GmfSetLin(self.file, GmfKwdCod::GmfSolAtVertices as c_int, &vals);
+                }
             }
         }
 
