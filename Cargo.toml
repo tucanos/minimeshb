@@ -7,27 +7,36 @@ links = "minimeshb"
 [dependencies]
 env_logger = "0.11.11"
 log = "0.4.34"
-tempfile = "3.27.0"
 libmeshb-sys = {git = "https://github.com/tucanos/libmeshb-sys.git", optional = true, tag = "0.1.0"}
+
+[dev-dependencies]
+tempfile = "3.27.0"
 rand = "0.10.2"
 
 [lints.rust]
-unused = "warn"
-warnings = "warn"
-unused_qualifications = "warn"
-nonstandard_style = "warn"
+unused = "deny"
+warnings = "deny"
+unused_qualifications = "deny"
+nonstandard_style = "deny"
 
 [lints.clippy]
-all = { level = "warn", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
-nursery = { level = "warn", priority = -1 }
-cargo = { level = "warn", priority = -1 }
-cargo_common_metadata = "allow"
-multiple_crate_versions = "allow"
-cast_precision_loss = "allow"
-cast_possible_truncation = "allow"
-cast_sign_loss = "allow"
-suboptimal_flops = "allow"
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
 missing_panics_doc = "allow"
+match_same_arms = "allow"
+similar_names = "allow"
+cast_possible_truncation = "allow"
 missing_errors_doc = "allow"
+cast_precision_loss = "allow"
+multiple_crate_versions = "allow"
+cargo_common_metadata = "allow"
+doc_markdown = "allow"
+suboptimal_flops = "allow"
+many_single_char_names = "allow"
+cast_sign_loss = "allow"
+cast_possible_wrap = "allow"
+should_panic_without_expect = "allow"
+unreadable_literal = "allow"
 

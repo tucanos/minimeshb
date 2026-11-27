@@ -4,6 +4,7 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{BufRead, BufReader, Read, Seek, SeekFrom},
+    path::Path,
 };
 
 #[derive(Debug)]
@@ -17,15 +18,15 @@ pub struct MeshbReader {
 
 impl MeshbReader {
     pub fn new(fname: &str) -> Result<Self> {
-        if !fname.ends_with(".mesh")
-            && !fname.ends_with(".meshb")
-            && !fname.ends_with(".sol")
-            && !fname.ends_with(".solb")
-        {
+        let ext = Path::new(fname)
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_ascii_lowercase);
+        if !matches!(ext.as_deref(), Some("mesh" | "meshb" | "sol" | "solb")) {
             return Err(Error::from(&format!("Invalid file extension for {fname}")));
         }
 
-        if fname.ends_with(".meshb") || fname.ends_with(".solb") {
+        if matches!(ext.as_deref(), Some("meshb" | "solb")) {
             Self::new_binary(fname)
         } else {
             Self::new_ascii(fname)
@@ -257,7 +258,7 @@ impl MeshbReader {
                 let len = self.reader.read_line(&mut line).unwrap();
                 assert_ne!(len, 0);
                 let trimmed_line = line.trim();
-                assert!(!trimmed_line.is_empty());
+                assert_ne!(trimmed_line, "");
                 for (i, v) in trimmed_line
                     .split(' ')
                     .filter(|x| !x.trim().is_empty())
@@ -306,7 +307,7 @@ impl MeshbReader {
                 let len = self.reader.read_line(&mut line).unwrap();
                 assert_ne!(len, 0);
                 let trimmed_line = line.trim();
-                assert!(!trimmed_line.is_empty());
+                assert_ne!(trimmed_line, "");
                 for (i, v) in trimmed_line
                     .split(' ')
                     .filter(|x| !x.trim().is_empty())
@@ -417,7 +418,7 @@ impl MeshbReader {
                         let len = self.reader.read_line(&mut line).unwrap();
                         assert_ne!(len, 0);
                         let trimmed_line = line.trim();
-                        assert!(!trimmed_line.is_empty());
+                        assert_ne!(trimmed_line, "");
                         tmp.clear();
                         for x in trimmed_line.split(' ') {
                             tmp.push(x.parse().unwrap());

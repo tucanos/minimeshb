@@ -41,6 +41,8 @@ jobs:
         key: libmeshb-${{ env.LIBMESHB_COMMIT }}
     - name: Run clippy
       uses: clechasseur/rs-clippy-check@v5
+      with:
+        args: --features=libmeshb-sys 
     - run: cargo fmt --check --all
     - name: Run tests
       uses: clechasseur/rs-cargo@v4

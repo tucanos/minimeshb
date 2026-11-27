@@ -104,7 +104,7 @@ impl GmfWriter {
         etype: GmfElementTypes,
         elems: I1,
         etags: I2,
-    ) -> Result<()> {
+    ) {
         assert_eq!(elems.len(), etags.len());
         debug!("Write {} elements ({:?})", elems.len(), etype);
 
@@ -141,10 +141,8 @@ impl GmfWriter {
                         i64::from(t),
                     );
                 },
-            };
+            }
         }
-
-        Ok(())
     }
 
     pub fn write_edges<
@@ -155,7 +153,8 @@ impl GmfWriter {
         elems: I1,
         tags: I2,
     ) -> Result<()> {
-        self.write_elements(GmfElementTypes::Edge, elems, tags)
+        self.write_elements(GmfElementTypes::Edge, elems, tags);
+        Ok(())
     }
 
     pub fn write_triangles<
@@ -166,7 +165,8 @@ impl GmfWriter {
         elems: I1,
         tags: I2,
     ) -> Result<()> {
-        self.write_elements(GmfElementTypes::Triangle, elems, tags)
+        self.write_elements(GmfElementTypes::Triangle, elems, tags);
+        Ok(())
     }
 
     pub fn write_tetrahedra<
@@ -177,7 +177,8 @@ impl GmfWriter {
         elems: I1,
         tags: I2,
     ) -> Result<()> {
-        self.write_elements(GmfElementTypes::Tetrahedron, elems, tags)
+        self.write_elements(GmfElementTypes::Tetrahedron, elems, tags);
+        Ok(())
     }
 
     /// Write a solution defined at the vertices (.sol(b) file)

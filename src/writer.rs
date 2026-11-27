@@ -2,8 +2,10 @@ use log::debug;
 
 use crate::{Error, Result};
 use std::{
+    fmt::Write as FmtWrite,
     fs::File,
     io::{BufWriter, Seek, Write},
+    path::Path,
 };
 
 #[derive(Debug)]
@@ -16,15 +18,15 @@ pub struct MeshbWriter {
 
 impl MeshbWriter {
     pub fn new(fname: &str, version: u8, dimension: u8) -> Result<Self> {
-        if !fname.ends_with(".mesh")
-            && !fname.ends_with(".meshb")
-            && !fname.ends_with(".sol")
-            && !fname.ends_with(".solb")
-        {
+        let ext = Path::new(fname)
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_ascii_lowercase);
+        if !matches!(ext.as_deref(), Some("mesh" | "meshb" | "sol" | "solb")) {
             return Err(Error::from(&format!("Invalid file extension for {fname}")));
         }
 
-        if fname.ends_with(".meshb") || fname.ends_with(".solb") {
+        if matches!(ext.as_deref(), Some("meshb" | "solb")) {
             Self::new_binary(fname, version, dimension)
         } else {
             Self::new_ascii(fname, version, dimension)
@@ -101,7 +103,7 @@ impl MeshbWriter {
         }
     }
 
-    const fn size_of_kwd(&self) -> u64 {
+    const fn size_of_kwd() -> u64 {
         size_of::<i32>() as u64
     }
 
@@ -123,7 +125,7 @@ impl MeshbWriter {
         res.write_kwd(3); // Dimension
         let mut next = res.writer.stream_position().unwrap();
         next += res.size_of_pos(); // Next
-        next += res.size_of_kwd(); // Dimension
+        next += Self::size_of_kwd(); // Dimension
         res.write_pos(i64::try_from(next).unwrap());
         res.write_kwd(i32::from(dimension));
         Ok(res)
@@ -151,7 +153,8 @@ impl MeshbWriter {
         debug!("write {} vertices", verts.len());
 
         if self.is_binary {
-            self.write_vertices_binary(verts, tags)
+            self.write_vertices_binary(verts, tags);
+            Ok(())
         } else {
             self.write_vertices_ascii(verts, tags)
         }
@@ -174,9 +177,9 @@ impl MeshbWriter {
         for (v, t) in verts.zip(tags) {
             line.clear();
             for x in v {
-                line += &format!("{x} ");
+                let _ = write!(&mut line, "{x} ");
             }
-            line += &format!("{t}");
+            let _ = write!(&mut line, "{t}");
             writeln!(self.writer, "{line}")?;
         }
 
@@ -191,9 +194,9 @@ impl MeshbWriter {
         &mut self,
         verts: I1,
         tags: I2,
-    ) -> Result<()> {
+    ) {
         let mut next = self.writer.stream_position().unwrap();
-        next += self.size_of_kwd(); // Keyword
+        next += Self::size_of_kwd(); // Keyword
         next += self.size_of_pos();
         next += self.size_of_index();
         next += u64::from(self.dimension) * verts.len() as u64 * self.size_of_float(); // Coordinates
@@ -209,8 +212,6 @@ impl MeshbWriter {
             }
             self.write_index(i64::from(t));
         }
-
-        Ok(())
     }
 
     fn write_elements<
@@ -227,7 +228,8 @@ impl MeshbWriter {
         debug!("write {} elements", elems.len());
 
         if self.is_binary {
-            self.write_elements_binary(kwd, elems, tags)
+            self.write_elements_binary(kwd, elems, tags);
+            Ok(())
         } else {
             self.write_elements_ascii(kwd, elems, tags)
         }
@@ -275,7 +277,7 @@ impl MeshbWriter {
         kwd: &str,
         elems: I1,
         tags: I2,
-    ) -> Result<()> {
+    ) {
         let (m, kwd) = match kwd {
             "Edges" => (2, 5),
             "EdgesP2" => (3, 25),
@@ -288,7 +290,7 @@ impl MeshbWriter {
         assert_eq!(N, m);
 
         let mut next = self.writer.stream_position().unwrap();
-        next += self.size_of_kwd(); // Keyword
+        next += Self::size_of_kwd(); // Keyword
         next += self.size_of_pos();
         next += self.size_of_index();
         next += (m * elems.len()) as u64 * self.size_of_index(); // Coordinates
@@ -304,8 +306,6 @@ impl MeshbWriter {
             }
             self.write_index(i64::from(t));
         }
-
-        Ok(())
     }
 
     pub fn write_edges<
@@ -461,10 +461,10 @@ impl MeshbWriter {
         sols: I,
     ) -> Result<()> {
         let mut next = self.writer.stream_position().unwrap();
-        next += self.size_of_kwd(); // Keyword
+        next += Self::size_of_kwd(); // Keyword
         next += self.size_of_pos();
         next += self.size_of_index();
-        next += 2 * self.size_of_kwd(); // field type
+        next += 2 * Self::size_of_kwd(); // field type
         next += N as u64 * sols.len() as u64 * self.size_of_float(); // Values
 
         self.write_kwd(label);
@@ -531,7 +531,7 @@ mod tests {
         writer.write_solution(sols.iter().copied()).unwrap();
         writer.close();
 
-        let mut reader = GmfReader::new(&fname).unwrap();
+        let reader = GmfReader::new(&fname).unwrap();
         assert_eq!(reader.dimension() as usize, D);
 
         for (i, sol) in reader.read_solution::<N>().unwrap().enumerate() {
